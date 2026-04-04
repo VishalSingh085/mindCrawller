@@ -435,6 +435,7 @@ router.get('/counselor/:counselorId', authenticateToken, getCounselorDetails);
 router.patch('/status', authenticateToken, updateStatus);
 router.get('/search/counselors', authenticateToken, searchCounselors);
 
+// Get all counsellors from database
 
 
 export default router;

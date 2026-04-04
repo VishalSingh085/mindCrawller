@@ -371,7 +371,7 @@ import {
 } from "../controllers/authController.js";
 import { body } from 'express-validator';
 import { verifyOtp } from "../middleware/verifyOtp.js";
-import { refreshAccessToken } from "../middleware/refreshToken.js";
+// refreshToken middleware import removed — route uses refreshAccessTokenHandler from authController
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { generateOtp } from "../utils/generateOtp.js";
 import { resendOtp } from "../utils/resendOtp.js";

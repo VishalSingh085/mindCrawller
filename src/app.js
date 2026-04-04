@@ -168,7 +168,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import http from "http";
 import { Server } from "socket.io";
-
 import { authRoutes } from "./routes/authRoutes.js";
 import videoRoutes from "./routes/videoRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js";

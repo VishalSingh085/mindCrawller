@@ -1,73 +1,157 @@
-
-
-// controllers/authController.js
 // middleware/authMiddleware.js
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
-import RefreshToken from '../models/refreshTokenModel.js';
+import Session from '../models/sessionModel.js';
+import { generateAccessToken, generateRefreshToken } from '../utils/token.js';
 
+// ────────────────────────────────────────────────────────────────────────────
+// Helper: attempt silent token refresh and continue the request
+// ────────────────────────────────────────────────────────────────────────────
+const tryRefreshAndContinue = async (req, res, next, incomingRefreshToken) => {
+    try {
+        // 1. Verify refresh token
+        let decoded;
+        try {
+            decoded = jwt.verify(incomingRefreshToken, process.env.REFRESH_SECRET);
+        } catch (err) {
+            return res.status(401).json({
+                success: false,
+                error: 'Refresh token invalid or expired. Please log in again.',
+                code: 'REFRESH_INVALID'
+            });
+        }
+
+        // 2. Find the session
+        const session = await Session.findById(decoded.sessionId);
+        if (!session || !session.isActive) {
+            return res.status(401).json({
+                success: false,
+                error: 'Session expired. Please log in again.',
+                code: 'SESSION_EXPIRED'
+            });
+        }
+
+        // 3. Ensure refresh token matches what we stored (token rotation guard)
+        if (session.refreshToken !== incomingRefreshToken) {
+            return res.status(401).json({
+                success: false,
+                error: 'Token mismatch. Please log in again.',
+                code: 'TOKEN_MISMATCH'
+            });
+        }
+
+        // 4. Load user
+        const user = await User.findById(decoded.userId);
+        if (!user || !user.isActive) {
+            return res.status(401).json({
+                success: false,
+                error: 'User not found or deactivated.',
+                code: 'USER_NOT_FOUND'
+            });
+        }
+
+        // 5. Issue new tokens (rotation)
+        const newAccessToken  = generateAccessToken(user._id, session._id);
+        const newRefreshToken = generateRefreshToken(user._id, session._id);
+
+        // 6. Persist new refresh token
+        session.refreshToken = newRefreshToken;
+        await session.save();
+
+        // 7. Set new cookies
+        const cookieBase = {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+            path: '/'
+        };
+        res.cookie('accessToken',  newAccessToken,  { ...cookieBase, maxAge: 15 * 60 * 1000 });
+        res.cookie('refreshToken', newRefreshToken, { ...cookieBase, maxAge: 7 * 24 * 60 * 60 * 1000 });
+
+        // 8. Expose new access token in header so frontend can store it
+        res.setHeader('X-New-Access-Token', newAccessToken);
+
+        // 9. Attach user and continue
+        req.user          = user;
+        req.userId        = user._id;
+        req.userRole      = user.role;
+        req.newAccessToken = newAccessToken;
+
+        return next();
+    } catch (err) {
+        console.error('tryRefreshAndContinue error:', err);
+        return res.status(401).json({
+            success: false,
+            error: 'Authentication failed. Please log in again.',
+            code: 'REFRESH_FAILED'
+        });
+    }
+};
+
+// ────────────────────────────────────────────────────────────────────────────
+// Main auth middleware
+// ────────────────────────────────────────────────────────────────────────────
 export const authMiddleware = async (req, res, next) => {
     try {
-        // Get token from Authorization header or cookie
+        // ── 1. Extract access token (header > cookie) ──
         let token = req.headers.authorization;
-        
         if (token && token.startsWith('Bearer ')) {
             token = token.split(' ')[1];
         } else if (req.cookies?.accessToken) {
             token = req.cookies.accessToken;
         }
-        
+
+        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+
+        // ── 2. No access token at all ──
         if (!token) {
-            return res.status(401).json({
-                success: false,
-                error: 'Authentication required. No token provided.'
-            });
-        }
-        
-        // Verify token
-        let decoded;
-        try {
-            // This checks the 15-minute token
-            decoded = jwt.verify(token, process.env.ACCESS_SECRET);
-        } catch (error) {
-            if (error.name === 'TokenExpiredError') {
-                return res.status(401).json({
-                    success: false,
-                    error: 'Token expired',
-                    code: 'TOKEN_EXPIRED'
-                });
+            if (refreshToken) {
+                // Try to silently refresh
+                return await tryRefreshAndContinue(req, res, next, refreshToken);
             }
             return res.status(401).json({
                 success: false,
-                error: 'Invalid token'
+                error: 'Authentication required. No token provided.',
+                code: 'NO_TOKEN'
             });
         }
-        
-        // Get user from database
+
+        // ── 3. Verify access token ──
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.ACCESS_SECRET);
+        } catch (error) {
+            if (error.name === 'TokenExpiredError' && refreshToken) {
+                // Access token expired – silently refresh using refresh token
+                console.log('Access token expired, attempting silent refresh...');
+                return await tryRefreshAndContinue(req, res, next, refreshToken);
+            }
+            return res.status(401).json({
+                success: false,
+                error: error.name === 'TokenExpiredError'
+                    ? 'Access token expired. Please provide a valid refresh token.'
+                    : 'Invalid token.',
+                code: error.name === 'TokenExpiredError' ? 'TOKEN_EXPIRED' : 'INVALID_TOKEN'
+            });
+        }
+
+        // ── 4. Load user ──
         const user = await User.findById(decoded.userId || decoded._id);
-        
         if (!user) {
-            return res.status(401).json({
-                success: false,
-                error: 'User not found'
-            });
+            return res.status(401).json({ success: false, error: 'User not found', code: 'USER_NOT_FOUND' });
         }
-        
         if (!user.isActive) {
-            return res.status(401).json({
-                success: false,
-                error: 'Account is deactivated'
-            });
+            return res.status(401).json({ success: false, error: 'Account is deactivated', code: 'ACCOUNT_DEACTIVATED' });
         }
-        
-        // Attach user info to request
-        req.user = user;
-        req.userId = user._id;
+
+        // ── 5. Attach user to request ──
+        req.user    = user;
+        req.userId  = user._id;
         req.userRole = user.role;
-        
-        next();
+
+        return next();
     } catch (error) {
-        console.error('middleware error:', error);
+        console.error('authMiddleware error:', error);
         return res.status(500).json({
             success: false,
             error: 'Authentication error'
