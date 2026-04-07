@@ -205,7 +205,7 @@ import twilio from "twilio";
 
 class OTPService {
    constructor() {
-    console.log('=== OTPService Constructor ===');
+    
     
     // Log credential details (be careful with production!)
     const emailUser = process.env.EMAIL_USER;

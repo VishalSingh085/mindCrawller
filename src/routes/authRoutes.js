@@ -393,7 +393,7 @@ authRoutes.post("/refresh-token", refreshAccessTokenHandler);
 authRoutes.post("/logout-all", authMiddleware, logoutAllDevices);
 authRoutes.get("/my-sessions", authMiddleware, getMySessions);
 
-// OTP ROUTES
+// OTP ROUTES For Login
 authRoutes.post("/generateOtp", generateOtp);
 authRoutes.post("/verifyOtp", verifyOtp);
 authRoutes.post("/resendOtp", resendOtp);
