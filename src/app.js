@@ -1,4 +1,3 @@
-
 // // // // src/app.js
 // // // import express from "express";
 // // // import cors from "cors";
@@ -33,7 +32,6 @@
 // // // // Initialize socket handler
 // // // const socketHandler = new SocketHandler(io);
 // // // socketHandler.initialize();
-
 
 // // // // Serve static files (uploaded images)
 // // // app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -74,11 +72,11 @@
 // // // ---------------------------
 // // const allowedOrigins = [
 // //   'http://localhost:3000',                 // React dev server
-// //   'http://localhost:5173', 
+// //   'http://localhost:5173',
 // //   'http://192.168.0.138:5173',                       // Vite (if used)
 // //   'https://your-frontend-domain.com',      // production domain
 // //   'https://td6lmn5q-5000.inc1.devtunnels.ms',
-// //   'https://aichatbotmediconeckt.netlify.app' 
+// //   'https://aichatbotmediconeckt.netlify.app'
 // //    // your tunnel
 // // ];
 
@@ -105,7 +103,7 @@
 // //   origin: function (origin, callback) {
 // //     // ✅ Allow requests with no origin (file:// protocol, mobile apps, Postman, etc.)
 // //     if (!origin) return callback(null, true);
-    
+
 // //     // Also check against allowed origins
 // //     if (allowedOrigins.indexOf(origin) !== -1) {
 // //       callback(null, true);
@@ -185,11 +183,11 @@
 // const allowedOrigins = [
 //   'https://your-frontend-origin.com',
 //   'http://localhost:3000',
-//   'http://localhost:5173', 
+//   'http://localhost:5173',
 //   'http://192.168.0.138:5173',
 //   'https://your-frontend-domain.com',
 //   'https://td6lmn5q-5000.inc1.devtunnels.ms',
-//   'https://aichatbotmediconeckt.netlify.app' 
+//   'https://aichatbotmediconeckt.netlify.app'
 // ];
 
 // app.use(cors({
@@ -207,13 +205,10 @@
 //   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
 // }));
 
-
-
 // app.use(express.urlencoded({ extended: true }));
 // app.use(helmet());
 // app.use(compression());
 // app.use(cookieParser());
-
 
 // // ---------------------------
 // // 3. Static files
@@ -231,7 +226,7 @@
 // app.use("/api/auth", authRoutes);
 // app.use("/api/chat", messageRoutes);
 // app.use("/api/call", callRoutes);
-// app.use("/api/video", videoRoutes); 
+// app.use("/api/video", videoRoutes);
 
 // // ---------------------------
 // // 5. HTTP & Socket.IO server
@@ -266,6 +261,7 @@ import messageRoutes from "./routes/messageRoutes.js";
 import callRoutes from "./routes/callRoutes.js";
 import SocketHandler from "./socket/socketHandler.js";
 import { videoCallController } from "./controllers/videoCallController.js"; // Add this import
+import { authenticateSocket } from "./middleware/auth.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -277,29 +273,53 @@ app.use(express.json());
 // 1. CORS configuration
 // ---------------------------
 const allowedOrigins = [
-  'https://your-frontend-origin.com',
-  'http://localhost:3000',
-  'http://localhost:5173', 
-  'http://192.168.0.138:5173',
-  'https://your-frontend-domain.com',
-  'https://td6lmn5q-5000.inc1.devtunnels.ms',
-  'https://aichatbotmediconeckt.netlify.app' 
+  "https://your-frontend-origin.com",
+  "http://localhost:3000",
+  "http://localhost:5173",
+  "http://192.168.0.138:5173",
+  "https://your-frontend-domain.com",
+  "https://aichatbotmediconeckt.netlify.app",
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
+const normalizeOrigin = (origin) => origin?.replace(/\/$/, "");
+const isDevTunnelOrigin = (origin) =>
+  /^https:\/\/[a-z0-9-]+-\d+\.inc\d+\.devtunnels\.ms$/i.test(origin);
+const isLocalOrigin = (origin) =>
+  /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+|[a-z0-9-]+\.local):\d+$/i.test(
+    origin,
+  );
+
+const isAllowedOrigin = (origin) => {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return true;
+
+  const exactMatch = allowedOrigins.some(
+    (allowedOrigin) => normalizeOrigin(allowedOrigin) === normalized,
+  );
+
+  return (
+    exactMatch || isDevTunnelOrigin(normalized) || isLocalOrigin(normalized)
+  );
+};
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (isAllowedOrigin(origin)) return callback(null, true);
+
       console.warn(`CORS blocked origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'), false);
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-}));
+      callback(new Error("Not allowed by CORS"), false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+    ],
+  }),
+);
 
 app.use(express.urlencoded({ extended: true }));
 app.use(helmet());
@@ -309,11 +329,11 @@ app.use(cookieParser());
 // ---------------------------
 // 3. Static files
 // ---------------------------
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
 // Serve password reset HTML page
-app.get('/reset-password/:token', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'reset-password.html'));
+app.get("/reset-password/:token", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "reset-password.html"));
 });
 
 // ---------------------------
@@ -322,7 +342,7 @@ app.get('/reset-password/:token', (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", messageRoutes);
 app.use("/api/call", callRoutes);
-app.use("/api/video", videoRoutes); 
+app.use("/api/video", videoRoutes);
 
 // ---------------------------
 // 5. HTTP & Socket.IO server
@@ -332,24 +352,29 @@ const server = http.createServer(app);
 // Create Socket.IO server with proper CORS
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins, // Use your allowed origins array
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"), false);
+    },
     methods: ["GET", "POST"],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
+
+io.use(authenticateSocket);
 
 // Make io accessible globally for your controllers
 global.io = io;
 
 // Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
   // Setup WebRTC signaling for video calls
   videoCallController.handleWebRTCSignaling(io, socket);
-  
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
   });
 });
 

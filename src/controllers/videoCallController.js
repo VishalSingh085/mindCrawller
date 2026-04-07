@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
-import { v4 as uuidv4 } from 'uuid';
-import User from '../models/userModel.js';
+import mongoose from "mongoose";
+import { v4 as uuidv4 } from "uuid";
+import User from "../models/userModel.js";
 
 // In-memory storage (replace with database in production)
 const callHistory = [];
@@ -9,7 +9,6 @@ const userCallHistory = new Map(); // userId -> array of calls
 const userStatus = new Map(); // Track online/busy status of users
 
 export const videoCallController = {
-  
   // Helper function to get user details from your database
   async getUserDetails(userId, userType) {
     try {
@@ -17,21 +16,21 @@ export const videoCallController = {
         console.log(`Invalid user ID format: ${userId}`);
         return null;
       }
-      
+
       const user = await User.findById(userId).select(
-        'fullName email role profilePhoto specialization rating experience location qualification languages aboutMe isActive anonymous'
+        "fullName email role profilePhoto specialization rating experience location qualification languages aboutMe isActive anonymous",
       );
-      
+
       if (!user) {
         console.log(`User not found with ID: ${userId}`);
         return null;
       }
-      
+
       if (!user.isActive) {
         console.log(`User is inactive: ${userId}`);
         return null;
       }
-      
+
       return {
         id: user._id,
         fullName: user.fullName,
@@ -43,15 +42,14 @@ export const videoCallController = {
         specialization: user.specialization || [],
         rating: user.rating || 0,
         experience: user.experience || 0,
-        qualification: user.qualification || '',
-        location: user.location || '',
+        qualification: user.qualification || "",
+        location: user.location || "",
         languages: user.languages || [],
-        aboutMe: user.aboutMe || '',
-        isActive: user.isActive
+        aboutMe: user.aboutMe || "",
+        isActive: user.isActive,
       };
-      
     } catch (error) {
-      console.error('Error in getUserDetails:', error);
+      console.error("Error in getUserDetails:", error);
       return null;
     }
   },
@@ -64,30 +62,30 @@ export const videoCallController = {
   // 4. If both are users -> respect anonymous setting (show "Anonymous" if target.anonymous === true)
   getDisplayName(targetUser, viewerId, viewerRole, targetRole) {
     if (!targetUser) return "Unknown User";
-    
+
     // Case 1: Viewer is counselor, target is user -> show user's real name
-    if (viewerRole === 'counselor' && targetRole === 'user') {
+    if (viewerRole === "counselor" && targetRole === "user") {
       return targetUser.fullName;
     }
-    
+
     // Case 2: Viewer is user, target is counselor -> show counselor's real name
-    if (viewerRole === 'user' && targetRole === 'counselor') {
+    if (viewerRole === "user" && targetRole === "counselor") {
       return targetUser.fullName;
     }
-    
+
     // Case 3: Both are counselors -> show real names
-    if (viewerRole === 'counselor' && targetRole === 'counselor') {
+    if (viewerRole === "counselor" && targetRole === "counselor") {
       return targetUser.fullName;
     }
-    
+
     // Case 4: Both are users -> respect anonymous setting
-    if (viewerRole === 'user' && targetRole === 'user') {
+    if (viewerRole === "user" && targetRole === "user") {
       if (targetUser.anonymous === true) {
         return "Anonymous";
       }
       return targetUser.fullName;
     }
-    
+
     // Default fallback
     return targetUser.fullName;
   },
@@ -95,79 +93,91 @@ export const videoCallController = {
   // 1. Initiate a video call request
   initiateCall: async (req, res) => {
     try {
-      const { 
-        initiatorId, 
+      const {
+        initiatorId,
         initiatorType,
-        receiverId, 
+        receiverId,
         receiverType,
-        callType = 'video',
-        message = "I'd like to start a video call with you."
+        callType = "video",
+        message = "I'd like to start a video call with you.",
       } = req.body;
-      
+
       if (!initiatorId || !initiatorType || !receiverId || !receiverType) {
-        return res.status(400).json({ 
-          success: false, 
-          error: 'initiatorId, initiatorType, receiverId, and receiverType are required' 
+        return res.status(400).json({
+          success: false,
+          error:
+            "initiatorId, initiatorType, receiverId, and receiverType are required",
         });
       }
-      
+
       // Validate ObjectIds
       if (!mongoose.Types.ObjectId.isValid(initiatorId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid initiatorId format'
+          error: "Invalid initiatorId format",
         });
       }
-      
+
       if (!mongoose.Types.ObjectId.isValid(receiverId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid receiverId format'
+          error: "Invalid receiverId format",
         });
       }
-      
+
       // Get user details
-      const initiatorDetails = await videoCallController.getUserDetails(initiatorId, initiatorType);
-      const receiverDetails = await videoCallController.getUserDetails(receiverId, receiverType);
-      
+      const initiatorDetails = await videoCallController.getUserDetails(
+        initiatorId,
+        initiatorType,
+      );
+      const receiverDetails = await videoCallController.getUserDetails(
+        receiverId,
+        receiverType,
+      );
+
       if (!initiatorDetails) {
-        return res.status(404).json({ 
-          success: false, 
-          error: `Initiator not found` 
+        return res.status(404).json({
+          success: false,
+          error: `Initiator not found`,
         });
       }
-      
+
       if (!receiverDetails) {
-        return res.status(404).json({ 
-          success: false, 
-          error: `Receiver not found` 
+        return res.status(404).json({
+          success: false,
+          error: `Receiver not found`,
         });
       }
-      
+
       // Check for existing active call request
       let existingCall = null;
       for (const [callId, call] of activeCalls.entries()) {
-        if (((call.initiator.id === initiatorId && call.receiver.id === receiverId) ||
-             (call.initiator.id === receiverId && call.receiver.id === initiatorId)) &&
-            call.status === 'pending' && call.isActive) {
+        if (
+          ((call.initiator.id === initiatorId &&
+            call.receiver.id === receiverId) ||
+            (call.initiator.id === receiverId &&
+              call.receiver.id === initiatorId)) &&
+          call.status === "pending" &&
+          call.isActive
+        ) {
           existingCall = call;
           break;
         }
       }
-      
+
       const callId = uuidv4();
       const roomId = uuidv4();
-      
+
       // Set expiration time (10 seconds from now)
       const expiresAt = new Date();
       expiresAt.setSeconds(expiresAt.getSeconds() + 10);
-      
+
       // If existing pending call exists, check if expired
       if (existingCall) {
         if (existingCall.expiresAt && new Date() > existingCall.expiresAt) {
-          console.log('Call request expired, reactivating');
-          
-          existingCall.status = 'pending';
+          console.log("Call request expired, reactivating");
+
+          existingCall.status = "pending";
           existingCall.isActive = true;
           existingCall.expiresAt = expiresAt;
           existingCall.initiator = {
@@ -175,30 +185,30 @@ export const videoCallController = {
             fullName: initiatorDetails.fullName,
             anonymous: initiatorDetails.anonymous,
             type: initiatorType,
-            profilePhoto: initiatorDetails.profilePhoto
+            profilePhoto: initiatorDetails.profilePhoto,
           };
           existingCall.receiver = {
             id: receiverId,
             fullName: receiverDetails.fullName,
             anonymous: receiverDetails.anonymous,
             type: receiverType,
-            profilePhoto: receiverDetails.profilePhoto
+            profilePhoto: receiverDetails.profilePhoto,
           };
           existingCall.requestMessage = message;
           existingCall.updatedAt = new Date();
-          
+
           activeCalls.set(existingCall.callId, existingCall);
-          
+
           // Emit real-time notification with appropriate display name
           if (global.io) {
             const initiatorDisplayName = videoCallController.getDisplayName(
               initiatorDetails,
               receiverId,
               receiverType,
-              initiatorType
+              initiatorType,
             );
-            
-            global.io.to(`user_${receiverId}`).emit('incoming_call_request', {
+
+            global.io.to(`user_${receiverId}`).emit("incoming_call_request", {
               callId: existingCall.callId,
               roomId: existingCall.roomId,
               from: initiatorDisplayName,
@@ -209,72 +219,75 @@ export const videoCallController = {
               message,
               expiresAt,
               remainingSeconds: 10,
-              timestamp: new Date()
+              timestamp: new Date(),
             });
           }
-          
+
           return res.status(201).json({
             success: true,
-            message: 'New call request sent',
+            message: "New call request sent",
             callId: existingCall.callId,
             roomId: existingCall.roomId,
-            status: 'pending',
+            status: "pending",
             expiresAt,
             callData: {
               id: existingCall.callId,
               roomId: existingCall.roomId,
-              initiator: { 
-                id: initiatorId, 
+              initiator: {
+                id: initiatorId,
                 displayName: videoCallController.getDisplayName(
                   initiatorDetails,
                   receiverId,
                   receiverType,
-                  initiatorType
+                  initiatorType,
                 ),
                 fullName: initiatorDetails.fullName,
                 isAnonymous: initiatorDetails.anonymous,
                 type: initiatorType,
-                profilePhoto: initiatorDetails.profilePhoto
+                profilePhoto: initiatorDetails.profilePhoto,
               },
-              receiver: { 
-                id: receiverId, 
+              receiver: {
+                id: receiverId,
                 displayName: videoCallController.getDisplayName(
                   receiverDetails,
                   initiatorId,
                   initiatorType,
-                  receiverType
+                  receiverType,
                 ),
                 fullName: receiverDetails.fullName,
                 isAnonymous: receiverDetails.anonymous,
                 type: receiverType,
-                profilePhoto: receiverDetails.profilePhoto
+                profilePhoto: receiverDetails.profilePhoto,
               },
-              status: 'pending',
+              status: "pending",
               expiresAt,
-              createdAt: new Date()
-            }
+              createdAt: new Date(),
+            },
           });
         } else {
           // Active pending request exists
-          const remainingSeconds = Math.max(0, Math.floor((existingCall.expiresAt - new Date()) / 1000));
-          
-          return res.status(400).json({ 
+          const remainingSeconds = Math.max(
+            0,
+            Math.floor((existingCall.expiresAt - new Date()) / 1000),
+          );
+
+          return res.status(400).json({
             success: false,
             error: `Call request already active. Please wait ${remainingSeconds} seconds before sending another request.`,
             status: existingCall.status,
             callId: existingCall.callId,
             expiresAt: existingCall.expiresAt,
-            remainingSeconds
+            remainingSeconds,
           });
         }
       }
-      
+
       // Create new call request (pending)
       const callData = {
         callId,
         roomId,
         type: callType,
-        status: 'pending',
+        status: "pending",
         initiatedBy: initiatorType,
         initiator: {
           id: initiatorId,
@@ -284,7 +297,7 @@ export const videoCallController = {
           profilePhoto: initiatorDetails.profilePhoto,
           email: initiatorDetails.email,
           specialization: initiatorDetails.specialization,
-          rating: initiatorDetails.rating
+          rating: initiatorDetails.rating,
         },
         receiver: {
           id: receiverId,
@@ -294,7 +307,7 @@ export const videoCallController = {
           profilePhoto: receiverDetails.profilePhoto,
           email: receiverDetails.email,
           specialization: receiverDetails.specialization,
-          rating: receiverDetails.rating
+          rating: receiverDetails.rating,
         },
         requestMessage: message,
         createdAt: new Date(),
@@ -304,35 +317,35 @@ export const videoCallController = {
         duration: 0,
         participants: new Map(),
         endedBy: null,
-        isActive: true
+        isActive: true,
       };
-      
+
       // Add initiator to participants
       callData.participants.set(initiatorId, {
         userId: initiatorId,
         fullName: initiatorDetails.fullName,
         anonymous: initiatorDetails.anonymous,
-        role: 'initiator',
+        role: "initiator",
         type: initiatorType,
         joinedAt: new Date(),
         isVideoEnabled: true,
         isAudioEnabled: true,
         isScreenSharing: false,
-        profilePhoto: initiatorDetails.profilePhoto
+        profilePhoto: initiatorDetails.profilePhoto,
       });
-      
+
       activeCalls.set(callId, callData);
-      
+
       // Emit real-time notification to receiver with appropriate display name
       if (global.io) {
         const initiatorDisplayName = videoCallController.getDisplayName(
           initiatorDetails,
           receiverId,
           receiverType,
-          initiatorType
+          initiatorType,
         );
-        
-        global.io.to(`user_${receiverId}`).emit('incoming_call_request', {
+
+        global.io.to(`user_${receiverId}`).emit("incoming_call_request", {
           callId,
           roomId,
           from: initiatorDisplayName,
@@ -343,87 +356,93 @@ export const videoCallController = {
           message,
           expiresAt,
           remainingSeconds: 10,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
       }
-      
+
       res.status(201).json({
         success: true,
-        message: 'Call request sent successfully',
+        message: "Call request sent successfully",
         callId,
         roomId,
-        status: 'pending',
+        status: "pending",
         expiresAt,
         callData: {
           id: callId,
           roomId,
-          initiator: { 
-            id: initiatorId, 
+          initiator: {
+            id: initiatorId,
             displayName: videoCallController.getDisplayName(
               initiatorDetails,
               receiverId,
               receiverType,
-              initiatorType
+              initiatorType,
             ),
             fullName: initiatorDetails.fullName,
             isAnonymous: initiatorDetails.anonymous,
             type: initiatorType,
-            profilePhoto: initiatorDetails.profilePhoto
+            profilePhoto: initiatorDetails.profilePhoto,
           },
-          receiver: { 
-            id: receiverId, 
+          receiver: {
+            id: receiverId,
             displayName: videoCallController.getDisplayName(
               receiverDetails,
               initiatorId,
               initiatorType,
-              receiverType
+              receiverType,
             ),
             fullName: receiverDetails.fullName,
             isAnonymous: receiverDetails.anonymous,
             type: receiverType,
-            profilePhoto: receiverDetails.profilePhoto
+            profilePhoto: receiverDetails.profilePhoto,
           },
-          status: 'pending',
+          status: "pending",
           expiresAt,
-          createdAt: new Date()
-        }
+          createdAt: new Date(),
+        },
       });
-      
     } catch (error) {
-      console.error('Error initiating call:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to initiate call',
-        details: error.message 
+      console.error("Error initiating call:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to initiate call",
+        details: error.message,
       });
     }
   },
-  
+
   // 2. Get pending call requests
   getPendingRequests: async (req, res) => {
     try {
       const { userId } = req.params;
       const { userType } = req.query;
-      
+
       const pendingRequests = [];
-      
+
       for (const [callId, call] of activeCalls.entries()) {
-        if (call.receiver.id === userId && 
-            call.status === 'pending' && 
-            call.isActive &&
-            call.expiresAt && 
-            new Date() < call.expiresAt) {
-          
-          const remainingSeconds = Math.max(0, Math.floor((call.expiresAt - new Date()) / 1000));
-          
+        if (
+          call.receiver.id === userId &&
+          call.status === "pending" &&
+          call.isActive &&
+          call.expiresAt &&
+          new Date() < call.expiresAt
+        ) {
+          const remainingSeconds = Math.max(
+            0,
+            Math.floor((call.expiresAt - new Date()) / 1000),
+          );
+
           // Get display name for the caller based on receiver's perspective
           const callerDisplayName = videoCallController.getDisplayName(
-            { fullName: call.initiator.fullName, anonymous: call.initiator.anonymous },
+            {
+              fullName: call.initiator.fullName,
+              anonymous: call.initiator.anonymous,
+            },
             userId,
             userType,
-            call.initiator.type
+            call.initiator.type,
           );
-          
+
           pendingRequests.push({
             callId: call.callId,
             roomId: call.roomId,
@@ -435,99 +454,105 @@ export const videoCallController = {
               type: call.initiator.type,
               profilePhoto: call.initiator.profilePhoto,
               specialization: call.initiator.specialization,
-              rating: call.initiator.rating
+              rating: call.initiator.rating,
             },
             callType: call.type,
             requestMessage: call.requestMessage,
             requestedAt: call.createdAt,
             expiresAt: call.expiresAt,
-            remainingSeconds
+            remainingSeconds,
           });
         }
       }
-      
+
       res.json({
         success: true,
         pendingRequests,
-        count: pendingRequests.length
+        count: pendingRequests.length,
       });
-      
     } catch (error) {
-      console.error('Error getting pending requests:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to get pending requests',
-        details: error.message 
+      console.error("Error getting pending requests:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get pending requests",
+        details: error.message,
       });
     }
   },
-  
+
   // 3. Accept call request
   acceptCall: async (req, res) => {
     try {
       const { callId } = req.params;
       const { acceptorId, acceptorType } = req.body;
-      
+
       if (!mongoose.Types.ObjectId.isValid(acceptorId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid acceptorId format'
+          error: "Invalid acceptorId format",
         });
       }
-      
+
       const call = activeCalls.get(callId);
-      
+
       if (!call) {
-        return res.status(404).json({ 
-          success: false, 
-          error: 'Call request not found' 
+        return res.status(404).json({
+          success: false,
+          error: "Call request not found",
         });
       }
-      
+
       // Verify the acceptor is the intended receiver
       if (call.receiver.id !== acceptorId) {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'You are not the intended recipient of this call' 
+        return res.status(403).json({
+          success: false,
+          error: "You are not the intended recipient of this call",
         });
       }
-      
+
       // Check if request has expired
-      if (call.status === 'pending' && call.expiresAt && new Date() > call.expiresAt) {
-        call.status = 'cancelled';
+      if (
+        call.status === "pending" &&
+        call.expiresAt &&
+        new Date() > call.expiresAt
+      ) {
+        call.status = "cancelled";
         call.isActive = false;
         call.cancelledAt = new Date();
         activeCalls.set(callId, call);
-        
-        return res.status(400).json({ 
+
+        return res.status(400).json({
           success: false,
-          error: 'Call request has expired. User needs to send a new request.',
-          status: 'expired',
+          error: "Call request has expired. User needs to send a new request.",
+          status: "expired",
           canResend: true,
-          callId: call._id
+          callId: call._id,
         });
       }
-      
-      if (call.status !== 'pending') {
-        return res.status(400).json({ 
+
+      if (call.status !== "pending") {
+        return res.status(400).json({
           success: false,
           error: `Cannot accept call. Current status: ${call.status}`,
-          status: call.status
+          status: call.status,
         });
       }
-      
+
       // Get acceptor details
-      const acceptorDetails = await videoCallController.getUserDetails(acceptorId, acceptorType);
-      
+      const acceptorDetails = await videoCallController.getUserDetails(
+        acceptorId,
+        acceptorType,
+      );
+
       if (!acceptorDetails) {
         return res.status(404).json({
           success: false,
-          error: 'Acceptor not found'
+          error: "Acceptor not found",
         });
       }
-      
+
       // Update call status to accepted/active
-      call.status = 'active';
+      call.status = "active";
       call.acceptedAt = new Date();
       call.expiresAt = null;
       call.receiver.fullName = acceptorDetails.fullName;
@@ -535,519 +560,520 @@ export const videoCallController = {
       call.receiver.profilePhoto = acceptorDetails.profilePhoto;
       call.receiver.specialization = acceptorDetails.specialization;
       call.receiver.rating = acceptorDetails.rating;
-      
+
       // Add receiver to participants
       call.participants.set(acceptorId, {
         userId: acceptorId,
         fullName: acceptorDetails.fullName,
         anonymous: acceptorDetails.anonymous,
-        role: 'receiver',
+        role: "receiver",
         type: acceptorType,
         joinedAt: new Date(),
         isVideoEnabled: true,
         isAudioEnabled: true,
         isScreenSharing: false,
-        profilePhoto: acceptorDetails.profilePhoto
+        profilePhoto: acceptorDetails.profilePhoto,
       });
-      
+
       // Update user status
-      userStatus.set(call.initiator.id, { status: 'busy', currentCall: callId });
-      userStatus.set(call.receiver.id, { status: 'busy', currentCall: callId });
-      
+      userStatus.set(call.initiator.id, {
+        status: "busy",
+        currentCall: callId,
+      });
+      userStatus.set(call.receiver.id, { status: "busy", currentCall: callId });
+
       activeCalls.set(callId, call);
-      
+
       // Notify initiator that call was accepted with appropriate display name
       if (global.io) {
         const acceptorDisplayName = videoCallController.getDisplayName(
           acceptorDetails,
           call.initiator.id,
           call.initiator.type,
-          acceptorType
+          acceptorType,
         );
-        
-        global.io.to(`user_${call.initiator.id}`).emit('call_accepted', {
+
+        global.io.to(`user_${call.initiator.id}`).emit("call_accepted", {
           callId,
           roomId: call.roomId,
           by: acceptorDisplayName,
           byProfilePhoto: acceptorDetails.profilePhoto,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
       }
-      
+
       // Prepare response with appropriate display names
       const initiatorDisplayName = videoCallController.getDisplayName(
-        { fullName: call.initiator.fullName, anonymous: call.initiator.anonymous },
+        {
+          fullName: call.initiator.fullName,
+          anonymous: call.initiator.anonymous,
+        },
         acceptorId,
         acceptorType,
-        call.initiator.type
+        call.initiator.type,
       );
-      
+
       const receiverDisplayName = videoCallController.getDisplayName(
-        { fullName: acceptorDetails.fullName, anonymous: acceptorDetails.anonymous },
+        {
+          fullName: acceptorDetails.fullName,
+          anonymous: acceptorDetails.anonymous,
+        },
         call.initiator.id,
         call.initiator.type,
-        acceptorType
+        acceptorType,
       );
-      
+
       res.json({
         success: true,
-        message: 'Call request accepted',
+        message: "Call request accepted",
         callId,
         roomId: call.roomId,
-        status: 'active',
+        status: "active",
         acceptedAt: call.acceptedAt,
-        participants: Array.from(call.participants.values()).map(p => ({
+        participants: Array.from(call.participants.values()).map((p) => ({
           ...p,
-          displayName: p.userId === call.initiator.id 
-            ? initiatorDisplayName 
-            : (p.userId === acceptorId ? receiverDisplayName : p.fullName)
-        }))
+          displayName:
+            p.userId === call.initiator.id
+              ? initiatorDisplayName
+              : p.userId === acceptorId
+                ? receiverDisplayName
+                : p.fullName,
+        })),
       });
-      
     } catch (error) {
-      console.error('Error accepting call:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to accept call',
-        details: error.message 
+      console.error("Error accepting call:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to accept call",
+        details: error.message,
       });
     }
   },
-  
-  // 4. Reject call request
- rejectCall: async (req, res) => {
-  try {
-    const { callId } = req.params;
-    const { userId, reason = 'declined' } = req.body;
-    
-    const call = activeCalls.get(callId);
-    
-    if (!call) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Call not found' 
-      });
-    }
-    
-    // Only receiver can reject
-    if (call.receiver.id !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Only the receiver can reject this call' 
-      });
-    }
-    
-    if (call.status !== 'pending') {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Cannot reject call. Current status: ${call.status}` 
-      });
-    }
-    
-    // Check if expired
-    if (call.expiresAt && new Date() > call.expiresAt) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Call request has already expired' 
-      });
-    }
-    
-    // Save to history
-    const historyEntry = {
-      id: call.callId,
-      roomId: call.roomId,
-      type: call.type,
-      status: 'rejected',
-      initiatedBy: call.initiatedBy,
-      initiator: call.initiator,
-      receiver: call.receiver,
-      createdAt: call.createdAt,
-      rejectedAt: new Date(),
-      reason,
-      rejectedBy: userId
-    };
-    
-    callHistory.unshift(historyEntry);
-    
-    [call.initiator.id, call.receiver.id].forEach(uid => {
-      if (!userCallHistory.has(uid)) {
-        userCallHistory.set(uid, []);
-      }
-      userCallHistory.get(uid).push(historyEntry);
-    });
-    
-    // Notify initiator
-    if (global.io) {
-      global.io.to(`user_${call.initiator.id}`).emit('call_rejected', {
-        callId,
-        reason,
-        by: call.receiver.fullName,
-        timestamp: new Date()
-      });
-    }
-    
-    // Remove from active calls
-    activeCalls.delete(callId);
-    
-    res.json({
-      success: true,
-      message: 'Call rejected',
-      call: historyEntry
-    });
-    
-  } catch (error) {
-    console.error('Error rejecting call:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to reject call',
-      details: error.message 
-    });
-  }
-},
 
-  
-  // 5. Join active call (after accepted)
-joinCall: async (req, res) => {
-  try {
-    const { callId } = req.params;
-    const { userId, userType } = req.body;
-    
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid userId format'
-      });
-    }
-    
-    const call = activeCalls.get(callId);
-    
-    if (!call) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Call not found' 
-      });
-    }
-    
-    // Check if user is authorized
-    const isInitiator = call.initiator.id === userId;
-    const isReceiver = call.receiver.id === userId;
-    
-    if (!isInitiator && !isReceiver) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Not authorized to join this call' 
-      });
-    }
-    
-    // Check if call is already ended
-    if (call.status === 'ended') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Call has already ended' 
-      });
-    }
-    
-    // Check if call request expired (only for pending)
-    if (call.status === 'pending' && call.expiresAt && new Date() > call.expiresAt) {
-      call.status = 'cancelled';
-      call.isActive = false;
-      activeCalls.set(callId, call);
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Call request has expired',
-        status: 'expired'
-      });
-    }
-    
-    // Get user details
-    const userDetails = await videoCallController.getUserDetails(userId, userType);
-    
-    if (!userDetails) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-    
-    // Auto-accept if call is pending and this is the receiver
-    const wasPending = call.status === 'pending';
-    
-    if (wasPending && isReceiver) {
-      // Update receiver info
-      call.receiver.fullName = userDetails.fullName;
-      call.receiver.anonymous = userDetails.anonymous;
-      call.receiver.profilePhoto = userDetails.profilePhoto;
-      call.receiver.specialization = userDetails.specialization;
-      call.receiver.rating = userDetails.rating;
-      call.acceptedAt = new Date();
-      call.expiresAt = null;
-      
-      // Notify initiator that call was accepted
-      if (global.io) {
-        global.io.to(`user_${call.initiator.id}`).emit('call_accepted', {
-          callId,
-          roomId: call.roomId,
-          by: userDetails.fullName,
-          timestamp: new Date()
+  // 4. Reject call request
+  rejectCall: async (req, res) => {
+    try {
+      const { callId } = req.params;
+      const { userId, reason = "declined" } = req.body;
+
+      const call = activeCalls.get(callId);
+
+      if (!call) {
+        return res.status(404).json({
+          success: false,
+          error: "Call not found",
         });
       }
-    }
-    
-    // Update initiator info if joining as initiator
-    if (wasPending && isInitiator) {
-      call.initiator.fullName = userDetails.fullName;
-      call.initiator.anonymous = userDetails.anonymous;
-      call.initiator.profilePhoto = userDetails.profilePhoto;
-      call.initiator.specialization = userDetails.specialization;
-      call.initiator.rating = userDetails.rating;
-    }
-    
-    // Add participant
-    if (!call.participants.has(userId)) {
-      call.participants.set(userId, {
-        userId,
-        fullName: userDetails.fullName,
-        anonymous: userDetails.anonymous,
-        role: isInitiator ? 'initiator' : 'receiver',
-        type: userType,
-        joinedAt: new Date(),
-        isVideoEnabled: true,
-        isAudioEnabled: true,
-        isScreenSharing: false,
-        profilePhoto: userDetails.profilePhoto
+
+      // Only receiver can reject
+      if (call.receiver.id !== userId) {
+        return res.status(403).json({
+          success: false,
+          error: "Only the receiver can reject this call",
+        });
+      }
+
+      if (call.status !== "pending") {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot reject call. Current status: ${call.status}`,
+        });
+      }
+
+      // Check if expired
+      if (call.expiresAt && new Date() > call.expiresAt) {
+        return res.status(400).json({
+          success: false,
+          error: "Call request has already expired",
+        });
+      }
+
+      // Save to history
+      const historyEntry = {
+        id: call.callId,
+        roomId: call.roomId,
+        type: call.type,
+        status: "rejected",
+        initiatedBy: call.initiatedBy,
+        initiator: call.initiator,
+        receiver: call.receiver,
+        createdAt: call.createdAt,
+        rejectedAt: new Date(),
+        reason,
+        rejectedBy: userId,
+      };
+
+      callHistory.unshift(historyEntry);
+
+      [call.initiator.id, call.receiver.id].forEach((uid) => {
+        if (!userCallHistory.has(uid)) {
+          userCallHistory.set(uid, []);
+        }
+        userCallHistory.get(uid).push(historyEntry);
+      });
+
+      // Notify initiator
+      if (global.io) {
+        global.io.to(`user_${call.initiator.id}`).emit("call_rejected", {
+          callId,
+          reason,
+          by: call.receiver.fullName,
+          timestamp: new Date(),
+        });
+      }
+
+      // Remove from active calls
+      activeCalls.delete(callId);
+
+      res.json({
+        success: true,
+        message: "Call rejected",
+        call: historyEntry,
+      });
+    } catch (error) {
+      console.error("Error rejecting call:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to reject call",
+        details: error.message,
       });
     }
-    
-    // Set start time when first participant joins
-    if (!call.startTime && call.participants.size >= 1) {
-      call.startTime = new Date();
-    }
-    
-    // Set call to active
-    call.status = 'active';
-    call.isActive = true;
-    
-    activeCalls.set(callId, call);
-    
-    // Update user status
-    userStatus.set(userId, { status: 'busy', currentCall: callId });
-    
-    // Notify other participant that someone joined
-    if (global.io) {
-      const otherUserId = isInitiator ? call.receiver.id : call.initiator.id;
-      
-      // Update other user's status if they're also in call
-      const otherStatus = userStatus.get(otherUserId);
-      if (otherStatus && otherStatus.currentCall === callId) {
-        userStatus.set(otherUserId, { status: 'busy', currentCall: callId });
+  },
+
+  // 5. Join active call (after accepted)
+  joinCall: async (req, res) => {
+    try {
+      const { callId } = req.params;
+      const { userId, userType } = req.body;
+
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid userId format",
+        });
       }
-      
-      global.io.to(`user_${otherUserId}`).emit('participant_joined', {
-        callId,
+
+      const call = activeCalls.get(callId);
+
+      if (!call) {
+        return res.status(404).json({
+          success: false,
+          error: "Call not found",
+        });
+      }
+
+      // Check if user is authorized
+      const isInitiator = call.initiator.id === userId;
+      const isReceiver = call.receiver.id === userId;
+
+      if (!isInitiator && !isReceiver) {
+        return res.status(403).json({
+          success: false,
+          error: "Not authorized to join this call",
+        });
+      }
+
+      // Check if call is already ended
+      if (call.status === "ended") {
+        return res.status(400).json({
+          success: false,
+          error: "Call has already ended",
+        });
+      }
+
+      // Check if call request expired (only for pending)
+      if (
+        call.status === "pending" &&
+        call.expiresAt &&
+        new Date() > call.expiresAt
+      ) {
+        call.status = "cancelled";
+        call.isActive = false;
+        activeCalls.set(callId, call);
+        return res.status(400).json({
+          success: false,
+          error: "Call request has expired",
+          status: "expired",
+        });
+      }
+
+      if (call.status === "pending") {
+        return res.status(409).json({
+          success: false,
+          error: "Call request must be accepted before joining",
+          status: "pending",
+          callId,
+        });
+      }
+
+      // Get user details
+      const userDetails = await videoCallController.getUserDetails(
         userId,
-        userName: userDetails.fullName,
         userType,
-        timestamp: new Date()
-      });
-    }
-    
-    // Prepare response with display names
-    const participantsList = Array.from(call.participants.values()).map(p => {
-      let displayName;
-      if (userId === p.userId) {
-        displayName = p.fullName;
-      } else {
-        displayName = videoCallController.getDisplayName(
-          { fullName: p.fullName, anonymous: p.anonymous },
+      );
+
+      if (!userDetails) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found",
+        });
+      }
+
+      // Add participant
+      if (!call.participants.has(userId)) {
+        call.participants.set(userId, {
           userId,
+          fullName: userDetails.fullName,
+          anonymous: userDetails.anonymous,
+          role: isInitiator ? "initiator" : "receiver",
+          type: userType,
+          joinedAt: new Date(),
+          isVideoEnabled: true,
+          isAudioEnabled: true,
+          isScreenSharing: false,
+          profilePhoto: userDetails.profilePhoto,
+        });
+      }
+
+      // Set start time when first participant joins
+      if (!call.startTime && call.participants.size >= 1) {
+        call.startTime = new Date();
+      }
+
+      // Set call to active
+      call.status = "active";
+      call.isActive = true;
+
+      activeCalls.set(callId, call);
+
+      // Update user status
+      userStatus.set(userId, { status: "busy", currentCall: callId });
+
+      // Notify other participant that someone joined
+      if (global.io) {
+        const otherUserId = isInitiator ? call.receiver.id : call.initiator.id;
+
+        // Update other user's status if they're also in call
+        const otherStatus = userStatus.get(otherUserId);
+        if (otherStatus && otherStatus.currentCall === callId) {
+          userStatus.set(otherUserId, { status: "busy", currentCall: callId });
+        }
+
+        global.io.to(`user_${otherUserId}`).emit("participant_joined", {
+          callId,
+          userId,
+          userName: userDetails.fullName,
           userType,
-          p.type
-        );
+          timestamp: new Date(),
+        });
       }
-      return { ...p, displayName };
-    });
-    
-    res.json({
-      success: true,
-      callId,
-      roomId: call.roomId,
-      status: call.status,
-      participants: participantsList,
-      startTime: call.startTime,
-      token: call.roomId,
-      currentUser: {
-        id: userId,
-        type: userType,
-        displayName: userDetails.fullName
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error joining call:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to join call',
-      details: error.message 
-    });
-  }
-},
-  
+
+      // Prepare response with display names
+      const participantsList = Array.from(call.participants.values()).map(
+        (p) => {
+          let displayName;
+          if (userId === p.userId) {
+            displayName = p.fullName;
+          } else {
+            displayName = videoCallController.getDisplayName(
+              { fullName: p.fullName, anonymous: p.anonymous },
+              userId,
+              userType,
+              p.type,
+            );
+          }
+          return { ...p, displayName };
+        },
+      );
+
+      res.json({
+        success: true,
+        callId,
+        roomId: call.roomId,
+        status: call.status,
+        participants: participantsList,
+        startTime: call.startTime,
+        token: call.roomId,
+        currentUser: {
+          id: userId,
+          type: userType,
+          displayName: userDetails.fullName,
+        },
+      });
+    } catch (error) {
+      console.error("Error joining call:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to join call",
+        details: error.message,
+      });
+    }
+  },
+
   // 6. End active call
-endCall: async (req, res) => {
-  try {
-    const { callId } = req.params;
-    const { userId } = req.body;
-    
-    const call = activeCalls.get(callId);
-    
-    if (!call) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Call not found' 
-      });
-    }
-    
-    // Check if user is a participant
-    const isParticipant = call.initiator.id === userId || call.receiver.id === userId;
-    
-    if (!isParticipant) {
-      return res.status(403).json({ 
-        success: false, 
-        error: 'Only call participants can end the call' 
-      });
-    }
-    
-    const endTime = new Date();
-    const duration = call.startTime 
-      ? Math.floor((endTime - call.startTime) / 1000)
-      : 0;
-    
-    const endedBy = call.initiator.id === userId ? call.initiator : call.receiver;
-    
-    // Save to history
-    const historyEntry = {
-      id: call.callId,
-      roomId: call.roomId,
-      type: call.type,
-      status: 'completed',
-      initiatedBy: call.initiatedBy,
-      initiator: call.initiator,
-      receiver: call.receiver,
-      createdAt: call.createdAt,
-      acceptedAt: call.acceptedAt,
-      startTime: call.startTime,
-      endTime,
-      duration,
-      endedBy: {
-        id: endedBy.id,
-        name: endedBy.fullName,
-        type: endedBy.type
-      },
-      participants: Array.from(call.participants.values())
-    };
-    
-    callHistory.unshift(historyEntry);
-    
-    [call.initiator.id, call.receiver.id].forEach(uid => {
-      if (!userCallHistory.has(uid)) {
-        userCallHistory.set(uid, []);
+  endCall: async (req, res) => {
+    try {
+      const { callId } = req.params;
+      const { userId } = req.body;
+
+      const call = activeCalls.get(callId);
+
+      if (!call) {
+        return res.status(404).json({
+          success: false,
+          error: "Call not found",
+        });
       }
-      userCallHistory.get(uid).push(historyEntry);
-    });
-    
-    // Update user status
-    userStatus.set(call.initiator.id, { status: 'online', currentCall: null });
-    userStatus.set(call.receiver.id, { status: 'online', currentCall: null });
-    
-    // Remove from active calls
-    activeCalls.delete(callId);
-    
-    // Notify other participant
-    const otherParticipant = call.initiator.id === userId ? call.receiver.id : call.initiator.id;
-    if (global.io) {
-      global.io.to(`user_${otherParticipant}`).emit('call_ended', {
-        callId,
+
+      // Check if user is a participant
+      const isParticipant =
+        call.initiator.id === userId || call.receiver.id === userId;
+
+      if (!isParticipant) {
+        return res.status(403).json({
+          success: false,
+          error: "Only call participants can end the call",
+        });
+      }
+
+      const endTime = new Date();
+      const duration = call.startTime
+        ? Math.floor((endTime - call.startTime) / 1000)
+        : 0;
+
+      const endedBy =
+        call.initiator.id === userId ? call.initiator : call.receiver;
+
+      // Save to history
+      const historyEntry = {
+        id: call.callId,
+        roomId: call.roomId,
+        type: call.type,
+        status: "completed",
+        initiatedBy: call.initiatedBy,
+        initiator: call.initiator,
+        receiver: call.receiver,
+        createdAt: call.createdAt,
+        acceptedAt: call.acceptedAt,
+        startTime: call.startTime,
+        endTime,
         duration,
-        endedBy: endedBy.fullName,
-        timestamp: new Date()
+        endedBy: {
+          id: endedBy.id,
+          name: endedBy.fullName,
+          type: endedBy.type,
+        },
+        participants: Array.from(call.participants.values()),
+      };
+
+      callHistory.unshift(historyEntry);
+
+      [call.initiator.id, call.receiver.id].forEach((uid) => {
+        if (!userCallHistory.has(uid)) {
+          userCallHistory.set(uid, []);
+        }
+        userCallHistory.get(uid).push(historyEntry);
+      });
+
+      // Update user status
+      userStatus.set(call.initiator.id, {
+        status: "online",
+        currentCall: null,
+      });
+      userStatus.set(call.receiver.id, { status: "online", currentCall: null });
+
+      // Remove from active calls
+      activeCalls.delete(callId);
+
+      // Notify other participant
+      const otherParticipant =
+        call.initiator.id === userId ? call.receiver.id : call.initiator.id;
+      if (global.io) {
+        global.io.to(`user_${otherParticipant}`).emit("call_ended", {
+          callId,
+          duration,
+          endedBy: endedBy.fullName,
+          timestamp: new Date(),
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Call ended successfully",
+        callSummary: {
+          callId,
+          duration,
+          endedAt: endTime,
+          endedBy: endedBy.fullName,
+        },
+      });
+    } catch (error) {
+      console.error("Error ending call:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to end call",
+        details: error.message,
       });
     }
-    
-    res.json({
-      success: true,
-      message: 'Call ended successfully',
-      callSummary: {
-        callId,
-        duration,
-        endedAt: endTime,
-        endedBy: endedBy.fullName
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error ending call:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to end call',
-      details: error.message 
-    });
-  }
-},
-  
+  },
+
   // 7. Resend expired call request
   resendCallRequest: async (req, res) => {
     try {
       const { callId } = req.params;
       const { userId, userType } = req.body;
-      
+
       const call = activeCalls.get(callId);
-      
+
       if (!call) {
-        return res.status(404).json({ 
-          success: false, 
-          error: 'Call not found' 
+        return res.status(404).json({
+          success: false,
+          error: "Call not found",
         });
       }
-      
+
       // Check authorization
       if (call.initiator.id !== userId) {
-        return res.status(403).json({ 
-          success: false, 
-          error: 'Only the initiator can resend the request' 
-        });
-      }
-      
-      // Only allow resend if call is cancelled or rejected
-      if (call.status !== 'cancelled' && call.status !== 'rejected') {
-        return res.status(400).json({ 
+        return res.status(403).json({
           success: false,
-          error: `Cannot resend. Call is ${call.status}` 
+          error: "Only the initiator can resend the request",
         });
       }
-      
+
+      // Only allow resend if call is cancelled or rejected
+      if (call.status !== "cancelled" && call.status !== "rejected") {
+        return res.status(400).json({
+          success: false,
+          error: `Cannot resend. Call is ${call.status}`,
+        });
+      }
+
       // Reset the call for new request
       const expiresAt = new Date();
       expiresAt.setSeconds(expiresAt.getSeconds() + 10);
-      
-      call.status = 'pending';
+
+      call.status = "pending";
       call.isActive = true;
       call.expiresAt = expiresAt;
       call.cancelledAt = null;
       call.rejectedAt = null;
       call.updatedAt = new Date();
-      
+
       activeCalls.set(callId, call);
-      
+
       // Emit new request notification
       if (global.io) {
         const initiatorDisplayName = videoCallController.getDisplayName(
-          { fullName: call.initiator.fullName, anonymous: call.initiator.anonymous },
+          {
+            fullName: call.initiator.fullName,
+            anonymous: call.initiator.anonymous,
+          },
           call.receiver.id,
           call.receiver.type,
-          call.initiator.type
+          call.initiator.type,
         );
-        
-        global.io.to(`user_${call.receiver.id}`).emit('incoming_call_request', {
+
+        global.io.to(`user_${call.receiver.id}`).emit("incoming_call_request", {
           callId,
           roomId: call.roomId,
           from: initiatorDisplayName,
@@ -1058,165 +1084,169 @@ endCall: async (req, res) => {
           message: call.requestMessage,
           expiresAt,
           remainingSeconds: 10,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
       }
-      
+
       res.json({
         success: true,
-        message: 'Call request resent successfully',
+        message: "Call request resent successfully",
         callId,
-        status: 'pending',
-        expiresAt
+        status: "pending",
+        expiresAt,
       });
-      
     } catch (error) {
-      console.error('Error resending request:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to resend request',
-        details: error.message 
+      console.error("Error resending request:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to resend request",
+        details: error.message,
       });
     }
   },
-  
+
   // 8. Auto-cancel expired call requests (background job)
   cancelExpiredRequests: async () => {
     try {
       const now = new Date();
       let cancelledCount = 0;
-      
+
       for (const [callId, call] of activeCalls.entries()) {
-        if (call.status === 'pending' && 
-            call.expiresAt && 
-            new Date(call.expiresAt) < now &&
-            call.isActive) {
-          
-          call.status = 'cancelled';
+        if (
+          call.status === "pending" &&
+          call.expiresAt &&
+          new Date(call.expiresAt) < now &&
+          call.isActive
+        ) {
+          call.status = "cancelled";
           call.isActive = false;
           call.cancelledAt = now;
           activeCalls.set(callId, call);
           cancelledCount++;
-          
+
           console.log(`Cancelled expired call request: ${callId}`);
-          
+
           // Notify initiator
           if (global.io) {
-            global.io.to(`user_${call.initiator.id}`).emit('call_expired', {
+            global.io.to(`user_${call.initiator.id}`).emit("call_expired", {
               callId,
-              message: 'Call request expired after 10 seconds'
+              message: "Call request expired after 10 seconds",
             });
           }
         }
       }
-      
+
       return cancelledCount;
     } catch (error) {
-      console.error('Error cancelling expired requests:', error);
+      console.error("Error cancelling expired requests:", error);
       return 0;
     }
   },
-  
+
   // ==================== STATUS MANAGEMENT ====================
-  
+
   // 9. Update user status
   updateUserStatus: async (req, res) => {
     try {
       const { userId, status } = req.body;
-      
-      if (!['online', 'offline', 'busy', 'away'].includes(status)) {
+
+      if (!["online", "offline", "busy", "away"].includes(status)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid status'
+          error: "Invalid status",
         });
       }
-      
-      const currentStatus = userStatus.get(userId) || { status: 'offline', currentCall: null };
+
+      const currentStatus = userStatus.get(userId) || {
+        status: "offline",
+        currentCall: null,
+      };
       currentStatus.status = status;
       userStatus.set(userId, currentStatus);
-      
+
       if (mongoose.Types.ObjectId.isValid(userId)) {
-        await User.findByIdAndUpdate(userId, { 
-          $set: { isActive: status === 'online' }
+        await User.findByIdAndUpdate(userId, {
+          $set: { isActive: status === "online" },
         });
       }
-      
+
       if (global.io) {
-        global.io.emit('user_status_changed', {
+        global.io.emit("user_status_changed", {
           userId,
           status,
-          timestamp: new Date()
+          timestamp: new Date(),
         });
       }
-      
+
       res.json({
         success: true,
-        message: 'Status updated successfully',
-        status: currentStatus
+        message: "Status updated successfully",
+        status: currentStatus,
       });
-      
     } catch (error) {
-      console.error('Error updating status:', error);
+      console.error("Error updating status:", error);
       res.status(500).json({
         success: false,
-        error: 'Failed to update status'
+        error: "Failed to update status",
       });
     }
   },
-  
+
   // 10. Get user status
   getUserStatus: async (req, res) => {
     try {
       const { userId } = req.params;
-      const status = userStatus.get(userId) || { status: 'offline', currentCall: null };
-      
+      const status = userStatus.get(userId) || {
+        status: "offline",
+        currentCall: null,
+      };
+
       res.json({
         success: true,
         userId,
         status: status.status,
         currentCall: status.currentCall,
-        isAvailable: status.status === 'online'
+        isAvailable: status.status === "online",
       });
-      
     } catch (error) {
-      console.error('Error getting status:', error);
+      console.error("Error getting status:", error);
       res.status(500).json({
         success: false,
-        error: 'Failed to get status'
+        error: "Failed to get status",
       });
     }
   },
-  
+
   // ==================== CALL HISTORY ====================
-  
+
   // 11. Get call history
   getCallHistory: async (req, res) => {
     try {
       const { userId } = req.params;
-      const { page = 1, limit = 20, status = 'all', type = 'all' } = req.query;
-      
+      const { page = 1, limit = 20, status = "all", type = "all" } = req.query;
+
       let userCalls = userCallHistory.get(userId) || [];
-      
-      if (status !== 'all') {
-        userCalls = userCalls.filter(call => call.status === status);
+
+      if (status !== "all") {
+        userCalls = userCalls.filter((call) => call.status === status);
       }
-      
-      if (type === 'initiated') {
-        userCalls = userCalls.filter(call => call.initiator.id === userId);
-      } else if (type === 'received') {
-        userCalls = userCalls.filter(call => call.receiver.id === userId);
+
+      if (type === "initiated") {
+        userCalls = userCalls.filter((call) => call.initiator.id === userId);
+      } else if (type === "received") {
+        userCalls = userCalls.filter((call) => call.receiver.id === userId);
       }
-      
+
       userCalls.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      
+
       const start = (parseInt(page) - 1) * parseInt(limit);
       const end = start + parseInt(limit);
       const paginatedCalls = userCalls.slice(start, end);
-      
-      const formattedCalls = paginatedCalls.map(call => {
+
+      const formattedCalls = paginatedCalls.map((call) => {
         const isInitiator = call.initiator.id === userId;
         const otherParticipant = isInitiator ? call.receiver : call.initiator;
-        
+
         return {
           id: call.id,
           with: otherParticipant.fullName,
@@ -1227,54 +1257,57 @@ endCall: async (req, res) => {
           duration: call.duration,
           timestamp: call.createdAt,
           status: call.status,
-          role: isInitiator ? 'initiator' : 'receiver',
+          role: isInitiator ? "initiator" : "receiver",
           endedBy: call.endedBy,
           reason: call.reason,
           acceptedAt: call.acceptedAt,
-          rejectedAt: call.rejectedAt
+          rejectedAt: call.rejectedAt,
         };
       });
-      
+
       res.json({
         success: true,
         history: formattedCalls,
         total: userCalls.length,
         page: parseInt(page),
-        totalPages: Math.ceil(userCalls.length / parseInt(limit))
+        totalPages: Math.ceil(userCalls.length / parseInt(limit)),
       });
-      
     } catch (error) {
-      console.error('Error fetching history:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch history'
+      console.error("Error fetching history:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch history",
       });
     }
   },
-  
+
   // 12. Get active calls
   getActiveCalls: async (req, res) => {
     try {
       const { userId } = req.params;
       const { userType } = req.query;
       const activeCallsList = [];
-      
+
       for (const [callId, call] of activeCalls.entries()) {
-        if (call.status !== 'ended' && 
-            call.isActive &&
-            (call.initiator.id === userId || call.receiver.id === userId)) {
-          
+        if (
+          call.status !== "ended" &&
+          call.isActive &&
+          (call.initiator.id === userId || call.receiver.id === userId)
+        ) {
           const isInitiator = call.initiator.id === userId;
           const otherParticipant = isInitiator ? call.receiver : call.initiator;
-          
+
           // Get display name for the other participant
           const otherDisplayName = videoCallController.getDisplayName(
-            { fullName: otherParticipant.fullName, anonymous: otherParticipant.anonymous },
+            {
+              fullName: otherParticipant.fullName,
+              anonymous: otherParticipant.anonymous,
+            },
             userId,
             userType,
-            otherParticipant.type
+            otherParticipant.type,
           );
-          
+
           activeCallsList.push({
             callId,
             roomId: call.roomId,
@@ -1283,70 +1316,75 @@ endCall: async (req, res) => {
               displayName: otherDisplayName,
               fullName: otherParticipant.fullName,
               type: otherParticipant.type,
-              profilePhoto: otherParticipant.profilePhoto
+              profilePhoto: otherParticipant.profilePhoto,
             },
             status: call.status,
             startTime: call.startTime,
             createdAt: call.createdAt,
             participants: Array.from(call.participants.values()),
-            duration: call.startTime 
+            duration: call.startTime
               ? Math.floor((new Date() - call.startTime) / 1000)
-              : 0
+              : 0,
           });
         }
       }
-      
+
       res.json({
         success: true,
         activeCalls: activeCallsList,
-        count: activeCallsList.length
+        count: activeCallsList.length,
       });
-      
     } catch (error) {
-      console.error('Error fetching active calls:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch active calls'
+      console.error("Error fetching active calls:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch active calls",
       });
     }
   },
-  
+
   // 13. Get call details
   getCallDetails: async (req, res) => {
     try {
       const { callId } = req.params;
       const { userId, userType } = req.query;
-      
+
       let call = activeCalls.get(callId);
       let isActive = true;
-      
+
       if (!call) {
-        call = callHistory.find(c => c.id === callId);
+        call = callHistory.find((c) => c.id === callId);
         isActive = false;
       }
-      
+
       if (!call) {
-        return res.status(404).json({ 
-          success: false, 
-          error: 'Call not found' 
+        return res.status(404).json({
+          success: false,
+          error: "Call not found",
         });
       }
-      
+
       // Get display names from the perspective of the requesting user
       const initiatorDisplayName = videoCallController.getDisplayName(
-        { fullName: call.initiator.fullName, anonymous: call.initiator.anonymous },
+        {
+          fullName: call.initiator.fullName,
+          anonymous: call.initiator.anonymous,
+        },
         userId,
         userType,
-        call.initiator.type
+        call.initiator.type,
       );
-      
+
       const receiverDisplayName = videoCallController.getDisplayName(
-        { fullName: call.receiver.fullName, anonymous: call.receiver.anonymous },
+        {
+          fullName: call.receiver.fullName,
+          anonymous: call.receiver.anonymous,
+        },
         userId,
         userType,
-        call.receiver.type
+        call.receiver.type,
       );
-      
+
       res.json({
         success: true,
         call: {
@@ -1356,11 +1394,11 @@ endCall: async (req, res) => {
           status: call.status,
           initiator: {
             ...call.initiator,
-            displayName: initiatorDisplayName
+            displayName: initiatorDisplayName,
           },
           receiver: {
             ...call.receiver,
-            displayName: receiverDisplayName
+            displayName: receiverDisplayName,
           },
           requestMessage: call.requestMessage,
           createdAt: call.createdAt,
@@ -1370,66 +1408,66 @@ endCall: async (req, res) => {
           startTime: call.startTime,
           endTime: call.endTime,
           duration: call.duration,
-          participants: isActive ? Array.from(call.participants.values()) : call.participants,
+          participants: isActive
+            ? Array.from(call.participants.values())
+            : call.participants,
           endedBy: call.endedBy,
-          expiresAt: call.expiresAt
+          expiresAt: call.expiresAt,
         },
-        isActive
+        isActive,
       });
-      
     } catch (error) {
-      console.error('Error fetching call details:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to fetch call details'
+      console.error("Error fetching call details:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch call details",
       });
     }
   },
-  
+
   // ==================== UTILITY ENDPOINTS ====================
-  
+
   // 14. Get all pending calls (for debugging)
   getAllPendingCalls: async (req, res) => {
     try {
       const pendingCalls = [];
-      
+
       for (const [callId, call] of activeCalls.entries()) {
-        if (call.status === 'pending' && call.isActive) {
-          const remainingSeconds = call.expiresAt 
+        if (call.status === "pending" && call.isActive) {
+          const remainingSeconds = call.expiresAt
             ? Math.max(0, Math.floor((call.expiresAt - new Date()) / 1000))
             : null;
-          
+
           pendingCalls.push({
             callId: call.callId,
             initiator: call.initiator,
             receiver: call.receiver,
             expiresAt: call.expiresAt,
             remainingSeconds,
-            createdAt: call.createdAt
+            createdAt: call.createdAt,
           });
         }
       }
-      
+
       res.json({
         success: true,
         pendingCalls,
-        count: pendingCalls.length
+        count: pendingCalls.length,
       });
-      
     } catch (error) {
-      console.error('Error getting pending calls:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to get pending calls'
+      console.error("Error getting pending calls:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get pending calls",
       });
     }
   },
-  
+
   // 15. Test endpoint - get all calls
   getAllCalls: async (req, res) => {
     try {
       const allCalls = [];
-      
+
       for (const [callId, call] of activeCalls.entries()) {
         allCalls.push({
           callId: call.callId,
@@ -1438,72 +1476,69 @@ endCall: async (req, res) => {
           status: call.status,
           isActive: call.isActive,
           expiresAt: call.expiresAt,
-          participants: Array.from(call.participants.values())
+          participants: Array.from(call.participants.values()),
         });
       }
-      
+
       res.json({
         success: true,
         activeCalls: allCalls,
         history: callHistory,
         userStatus: Array.from(userStatus.entries()),
         activeCount: activeCalls.size,
-        historyCount: callHistory.length
+        historyCount: callHistory.length,
       });
-      
     } catch (error) {
-      console.error('Error getting all calls:', error);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to get calls'
+      console.error("Error getting all calls:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get calls",
       });
     }
   },
   handleWebRTCSignaling: (io, socket) => {
     // When user joins a call room
-    socket.on('join-call', ({ callId, userId }) => {
+    socket.on("join-call", ({ callId, userId }) => {
       socket.join(`call_${callId}`);
-      socket.to(`call_${callId}`).emit('user-joined', { userId });
+      socket.to(`call_${callId}`).emit("user-joined", { userId });
       console.log(`User ${userId} joined call room ${callId}`);
     });
 
     // Offer (from caller to receiver)
-    socket.on('offer', ({ callId, offer, userId }) => {
-      socket.to(`call_${callId}`).emit('offer', { offer, userId });
+    socket.on("offer", ({ callId, offer, userId }) => {
+      socket.to(`call_${callId}`).emit("offer", { offer, userId });
       console.log(`Offer sent from ${userId} in call ${callId}`);
     });
 
     // Answer (from receiver to caller)
-    socket.on('answer', ({ callId, answer, userId }) => {
-      socket.to(`call_${callId}`).emit('answer', { answer, userId });
+    socket.on("answer", ({ callId, answer, userId }) => {
+      socket.to(`call_${callId}`).emit("answer", { answer, userId });
       console.log(`Answer sent from ${userId} in call ${callId}`);
     });
 
     // ICE Candidates (for NAT traversal)
-    socket.on('ice-candidate', ({ callId, candidate, userId }) => {
-      socket.to(`call_${callId}`).emit('ice-candidate', { candidate, userId });
+    socket.on("ice-candidate", ({ callId, candidate, userId }) => {
+      socket.to(`call_${callId}`).emit("ice-candidate", { candidate, userId });
       console.log(`ICE candidate from ${userId} in call ${callId}`);
     });
 
     // Toggle video/audio
-    socket.on('toggle-video', ({ callId, userId, enabled }) => {
-      socket.to(`call_${callId}`).emit('video-toggled', { userId, enabled });
+    socket.on("toggle-video", ({ callId, userId, enabled }) => {
+      socket.to(`call_${callId}`).emit("video-toggled", { userId, enabled });
     });
 
-    socket.on('toggle-audio', ({ callId, userId, enabled }) => {
-      socket.to(`call_${callId}`).emit('audio-toggled', { userId, enabled });
+    socket.on("toggle-audio", ({ callId, userId, enabled }) => {
+      socket.to(`call_${callId}`).emit("audio-toggled", { userId, enabled });
     });
 
     // Leave call
-    socket.on('leave-call', ({ callId, userId }) => {
+    socket.on("leave-call", ({ callId, userId }) => {
       socket.leave(`call_${callId}`);
-      socket.to(`call_${callId}`).emit('user-left', { userId });
+      socket.to(`call_${callId}`).emit("user-left", { userId });
       console.log(`User ${userId} left call room ${callId}`);
     });
-  }
+  },
 };
-
-
 
 // Auto-cancel expired requests every second
 setInterval(async () => {
@@ -1512,4 +1547,3 @@ setInterval(async () => {
     console.log(`Auto-cancelled ${cancelled} expired call requests`);
   }
 }, 1000);
-

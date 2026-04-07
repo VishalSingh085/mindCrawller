@@ -5505,7 +5505,6 @@ setInterval(
   60 * 60 * 1000,
 );
 
-
 export const updateUserById = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -6148,8 +6147,6 @@ export const updateUserById = async (req, res) => {
   }
 };
 
-
-
 export const sendEmailOTP = async (req, res) => {
   try {
     const { email } = req.body;
@@ -6161,12 +6158,10 @@ export const sendEmailOTP = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res
-        .status(409)
-        .json({
-          message: "User already exists with this email",
-          success: false,
-        });
+      return res.status(409).json({
+        message: "User already exists with this email",
+        success: false,
+      });
     }
 
     const otp = otpService.generateOTP();
@@ -6182,22 +6177,18 @@ export const sendEmailOTP = async (req, res) => {
       });
     } catch (sendError) {
       console.error("OTP sending error:", sendError);
-      return res
-        .status(500)
-        .json({
-          message: "Failed to send OTP. Please try again.",
-          success: false,
-        });
+      return res.status(500).json({
+        message: "Failed to send OTP. Please try again.",
+        success: false,
+      });
     }
   } catch (error) {
     console.error("Send email OTP error:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Error sending OTP",
-        success: false,
-        error: error.message,
-      });
+    return res.status(500).json({
+      message: "Error sending OTP",
+      success: false,
+      error: error.message,
+    });
   }
 };
 
@@ -6215,22 +6206,18 @@ export const verifyEmailOTP = async (req, res) => {
     const storedData = emailOTPStore.get(email);
 
     if (!storedData) {
-      return res
-        .status(400)
-        .json({
-          message: "No OTP found. Please request a new OTP.",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "No OTP found. Please request a new OTP.",
+        success: false,
+      });
     }
 
     if (Date.now() > storedData.expiresAt) {
       emailOTPStore.delete(email);
-      return res
-        .status(400)
-        .json({
-          message: "OTP has expired. Please request a new OTP.",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "OTP has expired. Please request a new OTP.",
+        success: false,
+      });
     }
 
     if (storedData.otp !== otp) {
@@ -6260,13 +6247,11 @@ export const verifyEmailOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("Verify email OTP error:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Error verifying OTP",
-        success: false,
-        error: error.message,
-      });
+    return res.status(500).json({
+      message: "Error verifying OTP",
+      success: false,
+      error: error.message,
+    });
   }
 };
 
@@ -6368,10 +6353,13 @@ export const sendPhoneOTP = async (req, res) => {
     }
 
     try {
-      const twilioModule = await import('twilio');
+      const twilioModule = await import("twilio");
       const twilio = twilioModule.default || twilioModule;
-      const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-      
+      const twilioClient = twilio(
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN,
+      );
+
       await twilioClient.messages.create({
         body: `Your verification code is: ${otp}. This code will expire in 10 minutes.`,
         from: twilioPhoneNumber,
@@ -6413,7 +6401,8 @@ export const sendPhoneOTP = async (req, res) => {
 
       if (sendError?.code === 20003) {
         return res.status(502).json({
-          message: "Twilio authentication failed. Please verify SMS credentials.",
+          message:
+            "Twilio authentication failed. Please verify SMS credentials.",
           success: false,
         });
       }
@@ -6425,13 +6414,11 @@ export const sendPhoneOTP = async (req, res) => {
     }
   } catch (error) {
     console.error("Send phone OTP error:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Error sending phone OTP",
-        success: false,
-        error: error.message,
-      });
+    return res.status(500).json({
+      message: "Error sending phone OTP",
+      success: false,
+      error: error.message,
+    });
   }
 };
 
@@ -6531,22 +6518,18 @@ export const verifyPhoneOTP = async (req, res) => {
     }
 
     if (!storedData) {
-      return res
-        .status(400)
-        .json({
-          message: "No OTP found. Please request a new OTP.",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "No OTP found. Please request a new OTP.",
+        success: false,
+      });
     }
 
     if (Date.now() > storedData.expiresAt) {
       phoneOTPStore.delete(foundEmail);
-      return res
-        .status(400)
-        .json({
-          message: "OTP has expired. Please request a new OTP.",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "OTP has expired. Please request a new OTP.",
+        success: false,
+      });
     }
 
     if (storedData.otp !== otp) {
@@ -6592,13 +6575,11 @@ export const verifyPhoneOTP = async (req, res) => {
     });
   } catch (error) {
     console.error("Verify phone OTP error:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Error verifying phone OTP",
-        success: false,
-        error: error.message,
-      });
+    return res.status(500).json({
+      message: "Error verifying phone OTP",
+      success: false,
+      error: error.message,
+    });
   }
 };
 // controllers/authController.js
@@ -6637,12 +6618,10 @@ export const completeRegistration = async (req, res) => {
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({
-          message: "Password must be at least 6 characters",
-          success: false,
-        });
+      return res.status(400).json({
+        message: "Password must be at least 6 characters",
+        success: false,
+      });
     }
 
     // DEBUG: Check what's in verifiedUsersStore
@@ -6977,7 +6956,7 @@ export const completeRegistration = async (req, res) => {
 //     //   sameSite: "none",
 //     //   maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
 //     // });
-  
+
 //     const cookieOptions = {
 //   httpOnly: true,
 //  secure: false,
@@ -6994,7 +6973,6 @@ export const completeRegistration = async (req, res) => {
 //       role: user.role,
 //     });
 
-
 //   } catch (error) {
 //     console.log("Login error:", error);
 //     return res
@@ -7010,7 +6988,7 @@ export const completeRegistration = async (req, res) => {
 // ================= LOGIN USER (Prevent multiple logins - returns error if already logged in) =================
 export const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, forceLogin = false } = req.body;
 
     if (!email || !password) {
       return res
@@ -7042,17 +7020,26 @@ export const loginUser = async (req, res) => {
     // Check if there's an existing active session for this user
     const existingActiveSession = await Session.findOne({
       userId: user._id,
-      isActive: true
+      isActive: true,
     });
 
     // If user already has an active session, return error
     if (existingActiveSession) {
+      if (forceLogin) {
+        await Session.updateMany(
+          { userId: user._id, isActive: true },
+          { isActive: false, logoutAt: new Date() },
+        );
+      } else {
       return res.status(409).json({
-        message: "User is already logged in. Please logout from existing session first.",
+        message:
+          "User is already logged in. Please logout from existing session first.",
         success: false,
         existingSessionId: existingActiveSession._id,
-        loggedInAt: existingActiveSession.createdAt
+        loggedInAt: existingActiveSession.createdAt,
+        canForceLogin: true,
       });
+      }
     }
 
     // Create new session
@@ -7076,7 +7063,9 @@ export const loginUser = async (req, res) => {
     newSession.refreshToken = refreshToken;
     await newSession.save();
 
-    console.log(`✅ Created new session for user ${user._id}: ${newSession._id}`);
+    console.log(
+      `✅ Created new session for user ${user._id}: ${newSession._id}`,
+    );
 
     // Set cookies
     const cookieOptions = {
@@ -7096,26 +7085,15 @@ export const loginUser = async (req, res) => {
       user: user.toJSON(),
       role: user.role,
     });
-
   } catch (error) {
     console.error("Login error:", error);
-    return res
-      .status(500)
-      .json({
-        message: "Error in login",
-        success: false,
-        error: error.message,
-      });
+    return res.status(500).json({
+      message: "Error in login",
+      success: false,
+      error: error.message,
+    });
   }
 };
-
-
-
-
-
-
-
-
 
 // export const loginUser = async (req, res) => {
 //     try {
@@ -7541,8 +7519,9 @@ export const loginUser = async (req, res) => {
 // ================= REFRESH ACCESS TOKEN =================
 export const refreshAccessToken = async (req, res) => {
   try {
-    const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-    
+    const incomingRefreshToken =
+      req.cookies?.refreshToken || req.body?.refreshToken;
+
     if (!incomingRefreshToken) {
       return res.status(401).json({ message: "No refresh token" });
     }
@@ -7556,50 +7535,49 @@ export const refreshAccessToken = async (req, res) => {
 
     // Find session using sessionId from refresh token
     const session = await Session.findById(decoded.sessionId);
-    
+
     if (!session || !session.isActive) {
       return res.status(401).json({ message: "Session expired" });
     }
-    
+
     if (session.refreshToken !== incomingRefreshToken) {
       return res.status(401).json({ message: "Token mismatch" });
     }
-    
+
     const user = await User.findById(decoded.userId);
     if (!user || !user.isActive) {
       return res.status(401).json({ message: "User not found" });
     }
-    
+
     // ✅ FIXED: Pass sessionId to generateAccessToken
     const newAccessToken = generateAccessToken(user._id, session._id);
     const newRefreshToken = generateRefreshToken(user._id, session._id);
-    
+
     // Update session with new refresh token
     session.refreshToken = newRefreshToken;
     await session.save();
-    
+
     // Set cookies (for browser clients)
     res.cookie("accessToken", newAccessToken, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      path: '/'
+      path: "/",
     });
-    
+
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: false,
       sameSite: "lax",
-      path: '/'
+      path: "/",
     });
-    
+
     // Return both tokens for Postman/frontend
     return res.json({
       success: true,
       accessToken: newAccessToken,
-      refreshToken: newRefreshToken  // Also return this
+      refreshToken: newRefreshToken, // Also return this
     });
-    
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -7706,7 +7684,10 @@ export const logout = async (req, res) => {
       try {
         const decoded = jwt.verify(refreshToken, process.env.REFRESH_SECRET);
         userId = decoded.userId;
-        console.log("✅ Got userId from refresh token in logout function:", userId);
+        console.log(
+          "✅ Got userId from refresh token in logout function:",
+          userId,
+        );
       } catch (error) {
         console.log("⚠️ Could not decode refresh token:", error.message);
       }
@@ -7718,16 +7699,18 @@ export const logout = async (req, res) => {
         // Invalidate the specific session with this refresh token
         const result = await Session.updateOne(
           { userId, refreshToken, isActive: true },
-          { isActive: false, logoutAt: new Date() }
+          { isActive: false, logoutAt: new Date() },
         );
-        
+
         if (result.modifiedCount === 0) {
           // If no specific session found, invalidate all active sessions for this user
           const allResult = await Session.updateMany(
             { userId, isActive: true },
-            { isActive: false, logoutAt: new Date() }
+            { isActive: false, logoutAt: new Date() },
           );
-          console.log(`✅ All ${allResult.modifiedCount} sessions invalidated for user: ${userId}`);
+          console.log(
+            `✅ All ${allResult.modifiedCount} sessions invalidated for user: ${userId}`,
+          );
         } else {
           console.log(`✅ Specific session invalidated for user: ${userId}`);
         }
@@ -7735,9 +7718,11 @@ export const logout = async (req, res) => {
         // No refresh token provided, invalidate ALL active sessions
         const result = await Session.updateMany(
           { userId, isActive: true },
-          { isActive: false, logoutAt: new Date() }
+          { isActive: false, logoutAt: new Date() },
         );
-        console.log(`✅ All ${result.modifiedCount} sessions invalidated for user: ${userId}`);
+        console.log(
+          `✅ All ${result.modifiedCount} sessions invalidated for user: ${userId}`,
+        );
       }
     } else {
       console.log("⚠️ No userId found, skipping session invalidation");
@@ -7748,7 +7733,7 @@ export const logout = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      path: "/"
+      path: "/",
     };
 
     res.clearCookie("accessToken", cookieOptions);
@@ -7758,9 +7743,8 @@ export const logout = async (req, res) => {
 
     return res.status(200).json({
       message: "Logged out successfully",
-      success: true
+      success: true,
     });
-
   } catch (error) {
     console.error("Logout error:", error);
 
@@ -7775,11 +7759,10 @@ export const logout = async (req, res) => {
     return res.status(500).json({
       message: "Error in logout",
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 };
-
 
 // ================= LOGOUT =================
 
@@ -7863,14 +7846,12 @@ export const getAllCounsellors = async (req, res) => {
       .select("-password")
       .sort({ createdAt: -1 });
 
-    return res
-      .status(200)
-      .json({
-        message: "Counsellors fetched successfully",
-        success: true,
-        counsellors,
-        count: counsellors.length,
-      });
+    return res.status(200).json({
+      message: "Counsellors fetched successfully",
+      success: true,
+      counsellors,
+      count: counsellors.length,
+    });
   } catch (error) {
     console.log("Get counsellors error:", error);
     return res
@@ -7895,13 +7876,11 @@ export const getCounsellorById = async (req, res) => {
         .json({ message: "Counsellor not found", success: false });
     }
 
-    return res
-      .status(200)
-      .json({
-        message: "Counsellor fetched successfully",
-        success: true,
-        counsellor: counsellor.toJSON(),
-      });
+    return res.status(200).json({
+      message: "Counsellor fetched successfully",
+      success: true,
+      counsellor: counsellor.toJSON(),
+    });
   } catch (error) {
     console.log("Get counsellor error:", error);
     return res
@@ -8940,12 +8919,10 @@ export const forgotPassword = async (req, res) => {
         .json({ success: false, message: "Error sending reset email" });
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: "Password reset instructions sent to your email",
-      });
+    res.status(200).json({
+      success: true,
+      message: "Password reset instructions sent to your email",
+    });
   } catch (error) {
     console.error("Forgot password error:", error);
     res
@@ -8967,12 +8944,10 @@ export const resetPassword = async (req, res) => {
     }
 
     if (password.length < 6) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Password must be at least 6 characters",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
     }
 
     const resetPasswordToken = crypto
@@ -8992,12 +8967,10 @@ export const resetPassword = async (req, res) => {
 
     const isSamePassword = await bcrypt.compare(password, user.password);
     if (isSamePassword) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "New password cannot be the same as old password",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "New password cannot be the same as old password",
+      });
     }
 
     user.password = await bcrypt.hash(password, 10);
@@ -9053,14 +9026,12 @@ export const registerCounsellor = async (req, res) => {
 export const getAlluser = async (req, res) => {
   try {
     const users = await User.find().select("-password");
-    return res
-      .status(200)
-      .json({
-        message: "Got all users",
-        success: true,
-        users,
-        count: users.length,
-      });
+    return res.status(200).json({
+      message: "Got all users",
+      success: true,
+      users,
+      count: users.length,
+    });
   } catch (error) {
     return res
       .status(500)
@@ -9076,13 +9047,11 @@ export const getUser = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
-    return res
-      .status(200)
-      .json({
-        message: "User fetched successfully",
-        success: true,
-        user: user.toJSON(),
-      });
+    return res.status(200).json({
+      message: "User fetched successfully",
+      success: true,
+      user: user.toJSON(),
+    });
   } catch (error) {
     return res
       .status(500)
@@ -9117,13 +9086,11 @@ export const checkRegistrationStatus = async (req, res) => {
     const userVerification = verifiedUsersStore.get(email);
 
     if (!userVerification) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          exists: false,
-          message: "No active registration session",
-        });
+      return res.status(404).json({
+        success: false,
+        exists: false,
+        message: "No active registration session",
+      });
     }
 
     return res.status(200).json({
