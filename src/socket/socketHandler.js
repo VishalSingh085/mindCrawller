@@ -252,9 +252,17 @@ class SocketHandler {
         return;
       }
       
-      // Join user's personal room
+      // Join the role-specific room and a stable fallback room so
+      // call notifications can be delivered regardless of role spelling.
       const userRoom = `${socket.userRole}_${socket.userId}`;
       socket.join(userRoom);
+      socket.join(`user_${socket.userId}`);
+      if (socket.userRole === 'counsellor') {
+        socket.join(`counselor_${socket.userId}`);
+      }
+      if (socket.userRole === 'counselor') {
+        socket.join(`counsellor_${socket.userId}`);
+      }
       
       // Join all active chats for this user
       await this.joinExistingChats(socket);

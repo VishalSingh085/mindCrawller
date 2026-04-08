@@ -9,6 +9,25 @@ const userCallHistory = new Map(); // userId -> array of calls
 const userStatus = new Map(); // Track online/busy status of users
 
 export const videoCallController = {
+  emitToParticipant(io, participantId, participantType, eventName, payload) {
+    if (!io || !participantId) return;
+
+    const normalizedType =
+      participantType === "counselor" ? "counsellor" : participantType;
+    const roomNames = new Set([
+      `user_${participantId}`,
+      `${normalizedType}_${participantId}`,
+    ]);
+
+    if (normalizedType === "counsellor") {
+      roomNames.add(`counselor_${participantId}`);
+    }
+
+    for (const roomName of roomNames) {
+      io.to(roomName).emit(eventName, payload);
+    }
+  },
+
   // Helper function to get user details from your database
   async getUserDetails(userId, userType) {
     try {
@@ -212,7 +231,12 @@ export const videoCallController = {
               initiatorType,
             );
 
-            global.io.to(`user_${receiverId}`).emit("incoming_call_request", {
+            videoCallController.emitToParticipant(
+              global.io,
+              receiverId,
+              receiverType,
+              "incoming_call_request",
+              {
               callId: existingCall.callId,
               roomId: existingCall.roomId,
               from: initiatorDisplayName,
@@ -224,7 +248,8 @@ export const videoCallController = {
               expiresAt,
               remainingSeconds: 10,
               timestamp: new Date(),
-            });
+              },
+            );
           }
 
           return res.status(201).json({
@@ -349,7 +374,12 @@ export const videoCallController = {
           initiatorType,
         );
 
-        global.io.to(`user_${receiverId}`).emit("incoming_call_request", {
+        videoCallController.emitToParticipant(
+          global.io,
+          receiverId,
+          receiverType,
+          "incoming_call_request",
+          {
           callId,
           roomId,
           from: initiatorDisplayName,
@@ -361,7 +391,8 @@ export const videoCallController = {
           expiresAt,
           remainingSeconds: 10,
           timestamp: new Date(),
-        });
+          },
+        );
       }
 
       res.status(201).json({
@@ -597,13 +628,19 @@ export const videoCallController = {
           acceptorType,
         );
 
-        global.io.to(`user_${call.initiator.id}`).emit("call_accepted", {
+        videoCallController.emitToParticipant(
+          global.io,
+          call.initiator.id,
+          call.initiator.type,
+          "call_accepted",
+          {
           callId,
           roomId: call.roomId,
           by: acceptorDisplayName,
           byProfilePhoto: acceptorDetails.profilePhoto,
           timestamp: new Date(),
-        });
+          },
+        );
       }
 
       // Prepare response with appropriate display names
@@ -718,12 +755,18 @@ export const videoCallController = {
 
       // Notify initiator
       if (global.io) {
-        global.io.to(`user_${call.initiator.id}`).emit("call_rejected", {
+        videoCallController.emitToParticipant(
+          global.io,
+          call.initiator.id,
+          call.initiator.type,
+          "call_rejected",
+          {
           callId,
           reason,
           by: call.receiver.fullName,
           timestamp: new Date(),
-        });
+          },
+        );
       }
 
       // Remove from active calls
@@ -863,13 +906,19 @@ export const videoCallController = {
           userStatus.set(otherUserId, { status: "busy", currentCall: callId });
         }
 
-        global.io.to(`user_${otherUserId}`).emit("participant_joined", {
+        videoCallController.emitToParticipant(
+          global.io,
+          otherUserId,
+          isInitiator ? call.receiver.type : call.initiator.type,
+          "participant_joined",
+          {
           callId,
           userId,
           userName: userDetails.fullName,
           userType,
           timestamp: new Date(),
-        });
+          },
+        );
       }
 
       // Prepare response with display names
@@ -993,12 +1042,21 @@ export const videoCallController = {
       const otherParticipant =
         call.initiator.id === userId ? call.receiver.id : call.initiator.id;
       if (global.io) {
-        global.io.to(`user_${otherParticipant}`).emit("call_ended", {
+        const otherParticipantType =
+          call.initiator.id === userId ? call.receiver.type : call.initiator.type;
+
+        videoCallController.emitToParticipant(
+          global.io,
+          otherParticipant,
+          otherParticipantType,
+          "call_ended",
+          {
           callId,
           duration,
           endedBy: endedBy.fullName,
           timestamp: new Date(),
-        });
+          },
+        );
       }
 
       res.json({
@@ -1077,7 +1135,12 @@ export const videoCallController = {
           call.initiator.type,
         );
 
-        global.io.to(`user_${call.receiver.id}`).emit("incoming_call_request", {
+        videoCallController.emitToParticipant(
+          global.io,
+          call.receiver.id,
+          call.receiver.type,
+          "incoming_call_request",
+          {
           callId,
           roomId: call.roomId,
           from: initiatorDisplayName,
@@ -1089,7 +1152,8 @@ export const videoCallController = {
           expiresAt,
           remainingSeconds: 10,
           timestamp: new Date(),
-        });
+          },
+        );
       }
 
       res.json({
@@ -1132,10 +1196,16 @@ export const videoCallController = {
 
           // Notify initiator
           if (global.io) {
-            global.io.to(`user_${call.initiator.id}`).emit("call_expired", {
+            videoCallController.emitToParticipant(
+              global.io,
+              call.initiator.id,
+              call.initiator.type,
+              "call_expired",
+              {
               callId,
               message: "Call request expired after 10 seconds",
-            });
+              },
+            );
           }
         }
       }
@@ -1510,19 +1580,34 @@ export const videoCallController = {
 
     // Offer (from caller to receiver)
     socket.on("offer", ({ callId, offer, userId }) => {
-      socket.to(`call_${callId}`).emit("offer", { offer, userId });
+      socket.to(`call_${callId}`).emit("offer", {
+        callId,
+        offer,
+        userId,
+        from: userId,
+      });
       console.log(`Offer sent from ${userId} in call ${callId}`);
     });
 
     // Answer (from receiver to caller)
     socket.on("answer", ({ callId, answer, userId }) => {
-      socket.to(`call_${callId}`).emit("answer", { answer, userId });
+      socket.to(`call_${callId}`).emit("answer", {
+        callId,
+        answer,
+        userId,
+        from: userId,
+      });
       console.log(`Answer sent from ${userId} in call ${callId}`);
     });
 
     // ICE Candidates (for NAT traversal)
     socket.on("ice-candidate", ({ callId, candidate, userId }) => {
-      socket.to(`call_${callId}`).emit("ice-candidate", { candidate, userId });
+      socket.to(`call_${callId}`).emit("ice-candidate", {
+        callId,
+        candidate,
+        userId,
+        from: userId,
+      });
       console.log(`ICE candidate from ${userId} in call ${callId}`);
     });
 
