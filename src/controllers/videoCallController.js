@@ -63,23 +63,27 @@ export const videoCallController = {
   getDisplayName(targetUser, viewerId, viewerRole, targetRole) {
     if (!targetUser) return "Unknown User";
 
+    // Normalize role spellings
+    const vRole = viewerRole === "counsellor" ? "counselor" : viewerRole;
+    const tRole = targetRole === "counsellor" ? "counselor" : targetRole;
+
     // Case 1: Viewer is counselor, target is user -> show user's real name
-    if (viewerRole === "counselor" && targetRole === "user") {
+    if (vRole === "counselor" && tRole === "user") {
       return targetUser.fullName;
     }
 
     // Case 2: Viewer is user, target is counselor -> show counselor's real name
-    if (viewerRole === "user" && targetRole === "counselor") {
+    if (vRole === "user" && tRole === "counselor") {
       return targetUser.fullName;
     }
 
     // Case 3: Both are counselors -> show real names
-    if (viewerRole === "counselor" && targetRole === "counselor") {
+    if (vRole === "counselor" && tRole === "counselor") {
       return targetUser.fullName;
     }
 
     // Case 4: Both are users -> respect anonymous setting
-    if (viewerRole === "user" && targetRole === "user") {
+    if (vRole === "user" && tRole === "user") {
       if (targetUser.anonymous === true) {
         return "Anonymous";
       }

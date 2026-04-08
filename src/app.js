@@ -274,6 +274,7 @@ app.use(express.json());
 // ---------------------------
 const allowedOrigins = [
   "https://your-frontend-origin.com",
+  "http://localhost:4173",
   "http://localhost:3000",
   "http://localhost:5173",
   "http://192.168.0.138:5173",
