@@ -55,11 +55,9 @@
 import jwt from "jsonwebtoken";
 
 export const generateAccessToken = (userId, sessionId) => {
-  return jwt.sign(
-    { userId, sessionId },
-    process.env.ACCESS_SECRET,
-    // { expiresIn: "15m" }
-  );
+  return jwt.sign({ userId, sessionId }, process.env.ACCESS_SECRET, {
+    expiresIn: "15d",
+  });
 };
 
 export const generateRefreshToken = (userId, sessionId) => {
@@ -77,7 +75,6 @@ export const verifyAccessToken = (token) => {
 export const verifyRefreshToken = (token) => {
   return jwt.verify(token, process.env.REFRESH_SECRET);
 };
-
 
 // export const generateAccessToken = (userId, sessionId) => {
 //   const secret = process.env.ACCESS_SECRET;
@@ -119,16 +116,16 @@ export const verifyRefreshToken = (token) => {
 //   }
 // };
 
-
 export const generateAccessRefreshToken = async (user, sessionId) => {
   try {
     const accessToken = jwt.sign(
       { userId: user._id, sessionId },
       process.env.ACCESS_SECRET,
+      { expiresIn: "15d" },
     );
 
     const refreshToken = jwt.sign(
-      { userId: user._id, sessionId },  // ✅ FIXED
+      { userId: user._id, sessionId }, // ✅ FIXED
       process.env.REFRESH_SECRET,
     );
 

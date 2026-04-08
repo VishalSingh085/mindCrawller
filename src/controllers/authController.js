@@ -6985,10 +6985,10 @@ export const completeRegistration = async (req, res) => {
 //   }
 // };
 
-// ================= LOGIN USER (Prevent multiple logins - returns error if already logged in) =================
+// ================= LOGIN USER (One-device policy: auto-logout previous sessions) =================
 export const loginUser = async (req, res) => {
   try {
-    const { email, password, forceLogin = false } = req.body;
+    const { email, password } = req.body;
 
     if (!email || !password) {
       return res
@@ -7017,30 +7017,11 @@ export const loginUser = async (req, res) => {
         .json({ message: "Invalid password", success: false });
     }
 
-    // Check if there's an existing active session for this user
-    const existingActiveSession = await Session.findOne({
-      userId: user._id,
-      isActive: true,
-    });
-
-    // If user already has an active session, return error
-    if (existingActiveSession) {
-      if (forceLogin) {
-        await Session.updateMany(
-          { userId: user._id, isActive: true },
-          { isActive: false, logoutAt: new Date() },
-        );
-      } else {
-      return res.status(409).json({
-        message:
-          "User is already logged in. Please logout from existing session first.",
-        success: false,
-        existingSessionId: existingActiveSession._id,
-        loggedInAt: existingActiveSession.createdAt,
-        canForceLogin: true,
-      });
-      }
-    }
+    // Enforce one-device policy: invalidate all previous active sessions.
+    const logoutResult = await Session.updateMany(
+      { userId: user._id, isActive: true },
+      { isActive: false, logoutAt: new Date() },
+    );
 
     // Create new session
     const newSession = new Session({
@@ -7084,6 +7065,7 @@ export const loginUser = async (req, res) => {
       refreshToken,
       user: user.toJSON(),
       role: user.role,
+      previousSessionsLoggedOut: logoutResult.modifiedCount,
     });
   } catch (error) {
     console.error("Login error:", error);
