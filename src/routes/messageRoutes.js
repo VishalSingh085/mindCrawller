@@ -88,11 +88,11 @@
 // router.get('/unread-count', authenticateToken, async (req, res) => {
 //   try {
 //     let unreadCount = 0;
-    
+
 //     if (req.user.role === 'user') {
 //       // Get all chats for user
 //       const chats = await Chat.find({ userId: req.user._id, isActive: true });
-      
+
 //       // Count unread messages from counselors
 //       for (const chat of chats) {
 //         const count = await Message.countDocuments({
@@ -105,7 +105,7 @@
 //     } else if (req.user.role === 'counsellor') {
 //       // Get all chats for counselor
 //       const chats = await Chat.find({ counselorId: req.user._id, isActive: true });
-      
+
 //       // Count unread messages from users
 //       for (const chat of chats) {
 //         const count = await Message.countDocuments({
@@ -116,7 +116,7 @@
 //         unreadCount += count;
 //       }
 //     }
-    
+
 //     res.json({ success: true, unreadCount });
 //   } catch (error) {
 //     console.error('Error getting unread count:', error);
@@ -134,20 +134,20 @@
 // router.post('/mark-all-read', authenticateToken, async (req, res) => {
 //   try {
 //     const { chatId } = req.body;
-    
+
 //     const chat = await Chat.findById(chatId);
 //     if (!chat) {
 //       return res.status(404).json({ error: 'Chat not found' });
 //     }
-    
+
 //     // Check authorization
 //     const isAuthorized = (req.user.role === 'user' && chat.userId.toString() === req.user._id.toString()) ||
 //                         (req.user.role === 'counsellor' && chat.counselorId.toString() === req.user._id.toString());
-    
+
 //     if (!isAuthorized) {
 //       return res.status(403).json({ error: 'Unauthorized' });
 //     }
-    
+
 //     // Mark messages as read
 //     const result = await Message.updateMany(
 //       {
@@ -160,9 +160,9 @@
 //         readAt: new Date()
 //       }
 //     );
-    
-//     res.json({ 
-//       success: true, 
+
+//     res.json({
+//       success: true,
 //       message: 'All messages marked as read',
 //       modifiedCount: result.modifiedCount
 //     });
@@ -182,31 +182,31 @@
 // router.delete('/clear/:chatId', authenticateToken, async (req, res) => {
 //   try {
 //     const chat = await Chat.findById(req.params.chatId);
-    
+
 //     if (!chat) {
 //       return res.status(404).json({ error: 'Chat not found' });
 //     }
-    
+
 //     // Check authorization
 //     const isAuthorized = (req.user.role === 'user' && chat.userId.toString() === req.user._id.toString()) ||
 //                         (req.user.role === 'counsellor' && chat.counselorId.toString() === req.user._id.toString());
-    
+
 //     if (!isAuthorized) {
 //       return res.status(403).json({ error: 'Unauthorized' });
 //     }
-    
+
 //     // Delete all messages in the chat
 //     const result = await Message.deleteMany({ chatId: chat._id });
-    
+
 //     // Update chat's last message
 //     await Chat.findByIdAndUpdate(chat._id, {
 //       lastMessage: null,
 //       lastMessageAt: null,
 //       updatedAt: new Date()
 //     });
-    
-//     res.json({ 
-//       success: true, 
+
+//     res.json({
+//       success: true,
 //       message: 'Chat cleared successfully',
 //       deletedCount: result.deletedCount
 //     });
@@ -228,14 +228,14 @@
 //     if (req.user.role !== 'user') {
 //       return res.status(403).json({ error: 'Only users can search counselors' });
 //     }
-    
+
 //     const { q } = req.query;
 //     if (!q) {
 //       return res.status(400).json({ error: 'Search query is required' });
 //     }
-    
+
 //     const searchRegex = new RegExp(q, 'i');
-    
+
 //     const counselors = await User.find(
 //       {
 //         role: 'counsellor',
@@ -257,7 +257,7 @@
 //     )
 //     .select('fullName specialization experience qualification aboutMe profilePhoto rating totalSessions languages consultationMode location')
 //     .sort({ rating: -1, fullName: 1 });
-    
+
 //     res.json({ counselors, count: counselors.length });
 //   } catch (error) {
 //     console.error('Error searching counselors:', error);
@@ -278,10 +278,10 @@
 //     const page = parseInt(req.query.page) || 1;
 //     const limit = parseInt(req.query.limit) || 20;
 //     const skip = (page - 1) * limit;
-    
+
 //     let chats;
 //     let total;
-    
+
 //     if (req.user.role === 'user') {
 //       total = await Chat.countDocuments({ userId: req.user._id, isActive: true });
 //       chats = await Chat.find({ userId: req.user._id, isActive: true })
@@ -299,12 +299,12 @@
 //     } else {
 //       return res.status(403).json({ error: 'Invalid user role' });
 //     }
-    
+
 //     // Add unread counts and last messages
 //     const chatsWithDetails = await Promise.all(chats.map(async (chat) => {
 //       const lastMessage = await Message.findOne({ chatId: chat._id })
 //         .sort({ createdAt: -1 });
-      
+
 //       let unreadCount = 0;
 //       if (req.user.role === 'user') {
 //         unreadCount = await Message.countDocuments({
@@ -319,9 +319,9 @@
 //           isRead: false
 //         });
 //       }
-      
+
 //       const otherParty = req.user.role === 'user' ? chat.counselorId : chat.userId;
-      
+
 //       return {
 //         id: chat._id,
 //         chatId: chat.chatId,
@@ -329,7 +329,7 @@
 //           id: otherParty._id,
 //           name: otherParty.fullName,
 //           avatar: otherParty.profilePhoto?.url || null,
-//           ...(req.user.role === 'user' && { 
+//           ...(req.user.role === 'user' && {
 //             specialization: otherParty.specialization,
 //             rating: otherParty.rating,
 //             isActive: otherParty.isActive
@@ -345,7 +345,7 @@
 //         startedAt: chat.startedAt
 //       };
 //     }));
-    
+
 //     res.json({
 //       chats: chatsWithDetails,
 //       pagination: {
@@ -371,19 +371,19 @@
 // router.delete('/message/:messageId', authenticateToken, async (req, res) => {
 //   try {
 //     const message = await Message.findById(req.params.messageId);
-    
+
 //     if (!message) {
 //       return res.status(404).json({ error: 'Message not found' });
 //     }
-    
+
 //     // Check if user is the sender
 //     if (message.senderId.toString() !== req.user._id.toString()) {
 //       return res.status(403).json({ error: 'You can only delete your own messages' });
 //     }
-    
+
 //     // Soft delete or hard delete? Here we'll do hard delete
 //     await message.deleteOne();
-    
+
 //     res.json({ success: true, message: 'Message deleted successfully' });
 //   } catch (error) {
 //     console.error('Error deleting message:', error);
@@ -392,8 +392,9 @@
 // });
 
 // export default router;
-import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import express from "express";
+import { authenticateToken } from "../middleware/auth.js";
+import { uploadChatAttachment } from "../middleware/multerConfig.js";
 import {
   getChats,
   startChat,
@@ -409,33 +410,37 @@ import {
   getCounselors,
   getCounselorDetails,
   updateStatus,
-  searchCounselors
-} from '../controllers/messageController.js';
+  searchCounselors,
+} from "../controllers/messageController.js";
 
 const router = express.Router();
 
 // ==================== CHAT REQUEST ROUTES ====================
-router.post('/start', authenticateToken, startChat);
-router.patch('/accept/:chatId', authenticateToken, acceptChat);
-router.patch('/reject/:chatId', authenticateToken, rejectChat);
-router.get('/pending-requests', authenticateToken, getPendingRequests);
+router.post("/start", authenticateToken, startChat);
+router.patch("/accept/:chatId", authenticateToken, acceptChat);
+router.patch("/reject/:chatId", authenticateToken, rejectChat);
+router.get("/pending-requests", authenticateToken, getPendingRequests);
 
 // ==================== CHAT MANAGEMENT ROUTES ====================
-router.get('/chats', authenticateToken, getChats);
-router.get('/chat/:chatId/messages', authenticateToken, getChatMessages);
-router.post('/chat/:chatId/message', authenticateToken, sendMessage);
-router.delete('/chat/:chatId', authenticateToken, deleteChat);
-router.delete('/clear/:chatId', authenticateToken, clearChat);
-router.post('/mark-all-read', authenticateToken, markAllRead);
-router.get('/unread-count', authenticateToken, getUnreadCount);
+router.get("/chats", authenticateToken, getChats);
+router.get("/chat/:chatId/messages", authenticateToken, getChatMessages);
+router.post(
+  "/chat/:chatId/message",
+  authenticateToken,
+  uploadChatAttachment,
+  sendMessage,
+);
+router.delete("/chat/:chatId", authenticateToken, deleteChat);
+router.delete("/clear/:chatId", authenticateToken, clearChat);
+router.post("/mark-all-read", authenticateToken, markAllRead);
+router.get("/unread-count", authenticateToken, getUnreadCount);
 
 // ==================== COUNSELOR ROUTES ====================
-router.get('/counselors', authenticateToken, getCounselors);
-router.get('/counselor/:counselorId', authenticateToken, getCounselorDetails);
-router.patch('/status', authenticateToken, updateStatus);
-router.get('/search/counselors', authenticateToken, searchCounselors);
+router.get("/counselors", authenticateToken, getCounselors);
+router.get("/counselor/:counselorId", authenticateToken, getCounselorDetails);
+router.patch("/status", authenticateToken, updateStatus);
+router.get("/search/counselors", authenticateToken, searchCounselors);
 
 // Get all counsellors from database
-
 
 export default router;

@@ -1100,6 +1100,10 @@ export const getChatMessages = async (req, res) => {
         content: msg.content,
         senderRole: msg.senderRole,
         contentType: msg.contentType,
+        attachmentUrl: msg.attachmentUrl,
+        attachmentName: msg.attachmentName,
+        attachmentMimeType: msg.attachmentMimeType,
+        attachmentSize: msg.attachmentSize,
         createdAt: msg.createdAt,
         isRead: msg.isRead,
       })),
@@ -1177,9 +1181,13 @@ export const sendMessage = async (req, res) => {
   try {
     const { chatId } = req.params;
     const { content } = req.body;
+    const attachment = req.file;
+    const trimmedContent = typeof content === "string" ? content.trim() : "";
 
-    if (!content || content.trim() === "") {
-      return res.status(400).json({ error: "Message content is required" });
+    if (!attachment && !trimmedContent) {
+      return res
+        .status(400)
+        .json({ error: "Message content or attachment is required" });
     }
 
     // Find chat by either _id OR chatId
@@ -1218,17 +1226,40 @@ export const sendMessage = async (req, res) => {
       });
     }
 
-    // Create message using chat._id (ObjectId)
-    const message = await Message.create({
-      chatId: chat._id, // Use the ObjectId, not the string chatId
+    const hasAttachment = Boolean(attachment);
+    const isImageAttachment =
+      hasAttachment && (attachment.mimetype || "").startsWith("image/");
+    const messageContent = hasAttachment
+      ? trimmedContent || attachment.originalname || "Attachment"
+      : trimmedContent;
+
+    const messagePayload = {
+      chatId: chat._id,
       senderId: req.user._id,
       senderRole: req.user.role,
-      content: content.trim(),
-      contentType: "TEXT",
-    });
+      content: messageContent,
+      contentType: hasAttachment
+        ? isImageAttachment
+          ? "IMAGE"
+          : "FILE"
+        : "TEXT",
+    };
+
+    if (hasAttachment) {
+      messagePayload.attachmentUrl =
+        attachment.path || attachment.secure_url || null;
+      messagePayload.attachmentName = attachment.originalname || null;
+      messagePayload.attachmentMimeType = attachment.mimetype || null;
+      messagePayload.attachmentSize = attachment.size || null;
+    }
+
+    // Create message using chat._id (ObjectId)
+    const message = await Message.create(messagePayload);
 
     // Update chat's last message
-    chat.lastMessage = content.trim();
+    chat.lastMessage = hasAttachment
+      ? `📎 ${messagePayload.attachmentName || "Attachment"}`
+      : messageContent;
     chat.lastMessageAt = new Date();
     chat.updatedAt = new Date();
     await chat.save();
@@ -1247,6 +1278,11 @@ export const sendMessage = async (req, res) => {
         content: populatedMessage.content,
         senderRole: populatedMessage.senderRole,
         senderName: populatedMessage.senderId?.fullName,
+        contentType: populatedMessage.contentType,
+        attachmentUrl: populatedMessage.attachmentUrl,
+        attachmentName: populatedMessage.attachmentName,
+        attachmentMimeType: populatedMessage.attachmentMimeType,
+        attachmentSize: populatedMessage.attachmentSize,
         createdAt: populatedMessage.createdAt,
         isRead: populatedMessage.isRead,
       },

@@ -1,157 +1,246 @@
-
 import multer from "multer";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import cloudinary from "../config/cloudinary.js";
 
 // Storage for profile photos
 const profileStorage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: "profile-photos",
-        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-        transformation: [{ width: 500, height: 500, crop: "limit" }]
-    }
+  cloudinary: cloudinary,
+  params: {
+    folder: "profile-photos",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+    transformation: [{ width: 500, height: 500, crop: "limit" }],
+  },
 });
 
 // Storage for certification documents
 const certificationStorage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: "certifications",
-        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "pdf"],
-        transformation: [{ width: 1000, height: 1000, crop: "limit" }]
-    }
+  cloudinary: cloudinary,
+  params: {
+    folder: "certifications",
+    allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "pdf"],
+    transformation: [{ width: 1000, height: 1000, crop: "limit" }],
+  },
 });
 
 // Dynamic storage based on field name
 // Dynamic storage based on field name
 const dynamicStorage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: (req, file) => {
-        console.log('Processing file:', file.fieldname, file.originalname);
-        
-        // Check if it's a profile photo
-        if (file.fieldname === 'profilePhoto') {
-            return {
-                folder: "profile-photos",
-                allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
-                transformation: [{ width: 500, height: 500, crop: "limit" }]
-            };
-        } 
-        // Check if it's a certification document (matches certifications[0][document], etc.)
-        else if (file.fieldname.includes('certifications') && file.fieldname.includes('document')) {
-            return {
-                folder: "certifications",
-                allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "pdf"],
-                transformation: [{ width: 1000, height: 1000, crop: "limit" }]
-            };
-        }
-        // Check if it's certificationDocuments field
-        else if (file.fieldname === 'certificationDocuments') {
-            return {
-                folder: "certifications",
-                allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "pdf"],
-                transformation: [{ width: 1000, height: 1000, crop: "limit" }]
-            };
-        }
-        return {};
+  cloudinary: cloudinary,
+  params: (req, file) => {
+    console.log("Processing file:", file.fieldname, file.originalname);
+
+    // Check if it's a profile photo
+    if (file.fieldname === "profilePhoto") {
+      return {
+        folder: "profile-photos",
+        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp"],
+        transformation: [{ width: 500, height: 500, crop: "limit" }],
+      };
     }
+    // Check if it's a certification document (matches certifications[0][document], etc.)
+    else if (
+      file.fieldname.includes("certifications") &&
+      file.fieldname.includes("document")
+    ) {
+      return {
+        folder: "certifications",
+        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "pdf"],
+        transformation: [{ width: 1000, height: 1000, crop: "limit" }],
+      };
+    }
+    // Check if it's certificationDocuments field
+    else if (file.fieldname === "certificationDocuments") {
+      return {
+        folder: "certifications",
+        allowed_formats: ["jpg", "jpeg", "png", "gif", "webp", "pdf"],
+        transformation: [{ width: 1000, height: 1000, crop: "limit" }],
+      };
+    }
+    return {};
+  },
 });
 
 // File filter for uploaded files
 // File filter for uploaded files
 const fileFilter = (req, file, cb) => {
-    // Check if it's a profile photo
-    if (file.fieldname === 'profilePhoto') {
-        const allowedTypes = /jpeg|jpg|png|gif|webp/;
-        if (allowedTypes.test(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files (jpeg, jpg, png, gif, webp) are allowed for profile photo'));
-        }
-    } 
-    // Check if it's a certification document - FIXED: Accept certificationDocuments
-    else if (file.fieldname === 'certificationDocuments') {
-        const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|ai/;
-        if (allowedTypes.test(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only images and PDF files are allowed for certifications'));
-        }
+  // Check if it's a profile photo
+  if (file.fieldname === "profilePhoto") {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    if (allowedTypes.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new Error(
+          "Only image files (jpeg, jpg, png, gif, webp) are allowed for profile photo",
+        ),
+      );
     }
-    // Check if it's a nested certification document (backward compatibility)
-    else if (file.fieldname.includes('certifications') && file.fieldname.includes('document')) {
-        const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|ai/;
-        if (allowedTypes.test(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only images and PDF files are allowed for certifications'));
-        }
-    } 
-    else {
-        // For any other file field, reject
-        cb(new Error(`Unexpected file field: ${file.fieldname}`));
+  }
+  // Check if it's a certification document - FIXED: Accept certificationDocuments
+  else if (file.fieldname === "certificationDocuments") {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|ai/;
+    if (allowedTypes.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only images and PDF files are allowed for certifications"));
     }
+  }
+  // Check if it's a nested certification document (backward compatibility)
+  else if (
+    file.fieldname.includes("certifications") &&
+    file.fieldname.includes("document")
+  ) {
+    const allowedTypes = /jpeg|jpg|png|gif|webp|pdf|ai/;
+    if (allowedTypes.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only images and PDF files are allowed for certifications"));
+    }
+  } else {
+    // For any other file field, reject
+    cb(new Error(`Unexpected file field: ${file.fieldname}`));
+  }
 };
 
 // Create multer instance that accepts any fields
 // Create multer instance that accepts any fields
 const upload = multer({
-    storage: dynamicStorage,
-    limits: { 
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    },
-    fileFilter: fileFilter
+  storage: dynamicStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: fileFilter,
+});
+
+const chatAttachmentStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "chat-attachments",
+    resource_type: "auto",
+    allowed_formats: [
+      "jpg",
+      "jpeg",
+      "png",
+      "gif",
+      "webp",
+      "pdf",
+      "doc",
+      "docx",
+      "txt",
+      "mp3",
+      "wav",
+      "mp4",
+      "mov",
+    ],
+  },
+});
+
+const chatAttachmentFilter = (req, file, cb) => {
+  if (file.fieldname !== "attachment") {
+    cb(new Error(`Unexpected file field: ${file.fieldname}`));
+    return;
+  }
+
+  const mimeType = (file.mimetype || "").toLowerCase();
+  const allowedMimeTypes = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+  ];
+
+  const isAllowed =
+    mimeType.startsWith("image/") ||
+    mimeType.startsWith("audio/") ||
+    mimeType.startsWith("video/") ||
+    allowedMimeTypes.includes(mimeType);
+
+  if (!isAllowed) {
+    cb(new Error("Unsupported file type for chat attachment"));
+    return;
+  }
+
+  cb(null, true);
+};
+
+const chatAttachmentUpload = multer({
+  storage: chatAttachmentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: chatAttachmentFilter,
 });
 
 // Handle user upload - accept all fields
 export const handleUserUpload = (req, res, next) => {
-    const contentType = req.headers['content-type'] || '';
-    
-    // Skip if not multipart
-    if (!contentType.includes('multipart/form-data')) {
-        return next();
+  const contentType = req.headers["content-type"] || "";
+
+  // Skip if not multipart
+  if (!contentType.includes("multipart/form-data")) {
+    return next();
+  }
+
+  // Use .any() to accept all fields (both files and text)
+  upload.any()(req, res, (err) => {
+    if (err) {
+      console.error("Multer Error:", err);
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
     }
-    
-    // Use .any() to accept all fields (both files and text)
-    upload.any()(req, res, (err) => {
-        if (err) {
-            console.error("Multer Error:", err);
-            return res.status(400).json({
-                success: false,
-                message: err.message
-            });
+
+    // Organize files by field name
+    if (req.files && req.files.length > 0) {
+      req.filesByField = {};
+
+      req.files.forEach((file) => {
+        if (!req.filesByField[file.fieldname]) {
+          req.filesByField[file.fieldname] = [];
         }
-        
-        // Organize files by field name
-        if (req.files && req.files.length > 0) {
-            req.filesByField = {};
-            
-            req.files.forEach(file => {
-                if (!req.filesByField[file.fieldname]) {
-                    req.filesByField[file.fieldname] = [];
-                }
-                req.filesByField[file.fieldname].push(file);
-            });
-            
-            // Set req.files for backward compatibility
-            req.files = req.filesByField;
-            
-            console.log('Files processed:');
-            Object.keys(req.filesByField).forEach(field => {
-                console.log(`  ${field}: ${req.filesByField[field].length} file(s)`);
-            });
-        }
-        
-        next();
-    });
+        req.filesByField[file.fieldname].push(file);
+      });
+
+      // Set req.files for backward compatibility
+      req.files = req.filesByField;
+
+      console.log("Files processed:");
+      Object.keys(req.filesByField).forEach((field) => {
+        console.log(`  ${field}: ${req.filesByField[field].length} file(s)`);
+      });
+    }
+
+    next();
+  });
+};
+
+export const uploadChatAttachment = (req, res, next) => {
+  const contentType = req.headers["content-type"] || "";
+
+  if (!contentType.includes("multipart/form-data")) {
+    next();
+    return;
+  }
+
+  chatAttachmentUpload.single("attachment")(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({
+        success: false,
+        error: err.message,
+      });
+    }
+
+    next();
+  });
 };
 
 // Handle user upload - accept all fields
 
-
 // Export individual middlewares for backward compatibility
-export const uploadProfilePhoto = upload.single('profilePhoto');
-export const uploadCertificationFiles = upload.array('certificationDocuments', 10);
+export const uploadProfilePhoto = upload.single("profilePhoto");
+export const uploadCertificationFiles = upload.array(
+  "certificationDocuments",
+  10,
+);
 export const uploadUserData = handleUserUpload;
 export { upload };
