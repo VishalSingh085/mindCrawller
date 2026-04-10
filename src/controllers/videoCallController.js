@@ -1060,26 +1060,62 @@ export const videoCallController = {
       // Remove from active calls
       activeCalls.delete(callId);
 
-      // Notify other participant
-      const otherParticipant =
-        call.initiator.id === userId ? call.receiver.id : call.initiator.id;
+      // Notify both participants and the call room so both UIs close immediately.
       if (global.io) {
-        const otherParticipantType =
-          call.initiator.id === userId
-            ? call.receiver.type
-            : call.initiator.type;
+        const endedAt = new Date();
+        const endedPayload = {
+          callId,
+          roomId: call.roomId,
+          duration,
+          status: "ended",
+          endedBy: endedBy.fullName,
+          endedById: endedBy.id,
+          endedByType: endedBy.type,
+          timestamp: endedAt,
+        };
+
+        const statusPayload = {
+          callId,
+          status: "ended",
+          from: endedBy.id,
+          timestamp: endedAt,
+        };
 
         videoCallController.emitToParticipant(
           global.io,
-          otherParticipant,
-          otherParticipantType,
+          call.initiator.id,
+          call.initiator.type,
           "call_ended",
-          {
-            callId,
-            duration,
-            endedBy: endedBy.fullName,
-            timestamp: new Date(),
-          },
+          endedPayload,
+        );
+        videoCallController.emitToParticipant(
+          global.io,
+          call.receiver.id,
+          call.receiver.type,
+          "call_ended",
+          endedPayload,
+        );
+
+        // Compatibility event name for clients expecting kebab-case.
+        global.io.to(`call_${callId}`).emit("call-ended", endedPayload);
+        global.io.to(`call_${callId}`).emit("call_ended", endedPayload);
+        global.io
+          .to(`call_${callId}`)
+          .emit("call-status-update", statusPayload);
+
+        videoCallController.emitToParticipant(
+          global.io,
+          call.initiator.id,
+          call.initiator.type,
+          "call-status-update",
+          statusPayload,
+        );
+        videoCallController.emitToParticipant(
+          global.io,
+          call.receiver.id,
+          call.receiver.type,
+          "call-status-update",
+          statusPayload,
         );
       }
 
