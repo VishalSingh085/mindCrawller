@@ -365,10 +365,6 @@ io.use(authenticateSocket);
 
 // Make io accessible globally for your controllers
 global.io = io;
-<<<<<<< HEAD
-=======
-io.use(authenticateSocket);
->>>>>>> a08d7822750d80e75aa0bad21029d20f488cb7fd
 
 // Initialize your existing socket handler (for chat, etc.)
 const socketHandler = new SocketHandler(io);
